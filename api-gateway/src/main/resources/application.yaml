@@ -45,6 +45,12 @@ spring:
                 - Path=/catalogo/v3/api-docs
               filters:
                 - StripPrefix=1
+            - id: ordenes-docs
+              uri: http://localhost:8083
+              predicates:
+                - Path=/ordenes/v3/api-docs
+              filters:
+                - StripPrefix=1
 
 app:
   jwt:
@@ -59,3 +65,5 @@ springdoc:
         url: /identidad/v3/api-docs
       - name: ms-catalogo
         url: /catalogo/v3/api-docs
+      - name: ms-ordenes
+        url: /ordenes/v3/api-docs

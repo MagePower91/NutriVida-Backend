@@ -1,0 +1,21 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: ms-ordenes
+  datasource:
+    url: jdbc:mysql://localhost:3306/nutrivida_ordenes?createDatabaseIfNotExist=true&serverTimezone=America/Santiago
+    username: root
+    password: mysqlmainpass99.
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    show-sql: true
+
+app:
+  jwt:
+    secreto: nutrivida-clave-secreta-de-desarrollo-2026-cambiar
+  servicios:
+    catalogo-url: http://localhost:8082

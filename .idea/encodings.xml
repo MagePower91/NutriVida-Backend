@@ -4,5 +4,6 @@
     <file url="file://$PROJECT_DIR$/api-gateway/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/ms-catalogo/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/ms-identidad/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ms-ordenes/src/main/java" charset="UTF-8" />
   </component>
 </project>
