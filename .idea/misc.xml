@@ -7,6 +7,7 @@
       <list>
         <option value="$PROJECT_DIR$/ms-identidad/pom.xml" />
         <option value="$PROJECT_DIR$/ms-catalogo/pom.xml" />
+        <option value="$PROJECT_DIR$/api-gateway/pom.xml" />
       </list>
     </option>
   </component>

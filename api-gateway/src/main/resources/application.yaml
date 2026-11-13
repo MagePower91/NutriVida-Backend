@@ -1,0 +1,61 @@
+#//Qué hace cada parte://
+#//routes: si la ruta coincide con Path, la petición se reenvía a la uri indicada.//
+#//StripPrefix=1: quita la primera parte de la ruta. Por ejemplo, /identidad/v3/api-docs llega a ms-identidad como /v3/api-docs.//
+#//secreto: debe ser exactamente igual al de los otros dos servicios.//
+#//La ruta de ordenes ya queda lista. Hasta que creemos ese servicio, si la llamas va a responder con un error.//
+
+
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          default-filters:
+            - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+          routes:
+            # ---------- APIs ----------
+            - id: identidad
+              uri: http://localhost:8081
+              predicates:
+                - Path=/api/v1/auth/**,/api/v1/usuarios/**
+            - id: catalogo
+              uri: http://localhost:8082
+              predicates:
+                - Path=/api/v1/servicios/**,/api/v1/categorias/**
+            - id: ordenes
+              uri: http://localhost:8083
+              predicates:
+                - Path=/api/v1/carrito/**,/api/v1/ordenes/**
+            # ---------- Documentación Swagger de cada servicio ----------
+            - id: identidad-docs
+              uri: http://localhost:8081
+              predicates:
+                - Path=/identidad/v3/api-docs
+              filters:
+                - StripPrefix=1
+            - id: catalogo-docs
+              uri: http://localhost:8082
+              predicates:
+                - Path=/catalogo/v3/api-docs
+              filters:
+                - StripPrefix=1
+
+app:
+  jwt:
+    secreto: nutrivida-clave-secreta-de-desarrollo-2026-cambiar
+  cors:
+    origenes: http://localhost:5173
+
+springdoc:
+  swagger-ui:
+    urls:
+      - name: ms-identidad
+        url: /identidad/v3/api-docs
+      - name: ms-catalogo
+        url: /catalogo/v3/api-docs
