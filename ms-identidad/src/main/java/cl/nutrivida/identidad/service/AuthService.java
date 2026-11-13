@@ -72,7 +72,7 @@ public class AuthService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Usuario no encontrado."));
     }
 
-    private AuthResponse emitirTokens(Usuario u) {
+    public AuthResponse emitirTokens(Usuario u) {
         RefreshToken rt = refreshTokens.save(new RefreshToken(
                 UUID.randomUUID().toString(), u, Instant.now().plus(refreshDias, ChronoUnit.DAYS)));
         return new AuthResponse(jwtService.generarAccessToken(u), rt.getToken(), "Bearer",

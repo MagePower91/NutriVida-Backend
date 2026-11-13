@@ -6,6 +6,7 @@
     <option name="originalFiles">
       <list>
         <option value="$PROJECT_DIR$/ms-identidad/pom.xml" />
+        <option value="$PROJECT_DIR$/ms-catalogo/pom.xml" />
       </list>
     </option>
   </component>
