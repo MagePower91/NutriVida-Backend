@@ -255,4 +255,6 @@ src/main/java/cl/nutrivida/<servicio>/
 
 ## Equipo
 
-- _(completar con los nombres de los integrantes)_
+- Carolina Flores
+- Dennis Fraser
+- Ana Vidal
