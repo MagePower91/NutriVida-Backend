@@ -5,9 +5,9 @@ spring:
   application:
     name: ms-catalogo
   datasource:
-    url: jdbc:mysql://localhost:3306/nutrivida_catalogo?createDatabaseIfNotExist=true&serverTimezone=America/Santiago
-    username: root
-    password: mysqlmainpass99.
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/nutrivida_catalogo?createDatabaseIfNotExist=true&serverTimezone=America/Santiago
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: update
@@ -16,4 +16,4 @@ spring:
 
 app:
   jwt:
-    secreto: nutrivida-clave-secreta-de-desarrollo-2026-cambiar
+    secreto: ${JWT_SECRET}
