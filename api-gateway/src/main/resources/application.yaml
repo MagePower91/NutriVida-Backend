@@ -45,10 +45,16 @@ spring:
                 - Path=/catalogo/v3/api-docs
               filters:
                 - StripPrefix=1
+            - id: ordenes-docs
+              uri: http://localhost:8083
+              predicates:
+                - Path=/ordenes/v3/api-docs
+              filters:
+                - StripPrefix=1
 
 app:
   jwt:
-    secreto: nutrivida-clave-secreta-de-desarrollo-2026-cambiar
+    secreto: ${JWT_SECRET}
   cors:
     origenes: http://localhost:5173
 
@@ -59,3 +65,5 @@ springdoc:
         url: /identidad/v3/api-docs
       - name: ms-catalogo
         url: /catalogo/v3/api-docs
+      - name: ms-ordenes
+        url: /ordenes/v3/api-docs

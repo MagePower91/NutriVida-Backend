@@ -1,0 +1,21 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: ms-ordenes
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/nutrivida_ordenes?createDatabaseIfNotExist=true&serverTimezone=America/Santiago
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    show-sql: true
+
+app:
+  jwt:
+    secreto: ${JWT_SECRET}
+  servicios:
+    catalogo-url: ${CATALOGO_URL:http://localhost:8082}
