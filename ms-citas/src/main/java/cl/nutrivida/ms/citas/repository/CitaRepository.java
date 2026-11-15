@@ -19,6 +19,12 @@ public interface CitaRepository extends JpaRepository<Cita, Long> {
     // Buscar citas de un paciente
     List<Cita> findByPacienteCorreo(String pacienteCorreo);
 
+    // Citas de un paciente sin distinguir mayúsculas en el correo (el token puede traerlo distinto)
+    List<Cita> findByPacienteCorreoIgnoreCaseOrderByFechaHoraAsc(String pacienteCorreo);
+
+    // Agenda de un nutricionista
+    List<Cita> findByNutricionistaOrderByFechaHoraAsc(String nutricionista);
+
     // Buscar citas según su estado
     List<Cita> findByEstadoCita(EstadoCita estadoCita);
 
