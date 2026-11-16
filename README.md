@@ -12,30 +12,23 @@ Arquitectura de **microservicios con Spring Boot**, autenticación con **JWT** (
 
 ```mermaid
 flowchart LR
-    FE["Frontend React<br/>localhost:5173"] --> GW
+    FE[Frontend React<br/>localhost:5173] --> GW
 
     subgraph Backend
-        GW["api-gateway<br/>:8080<br/>rutas · JWT · CORS · Swagger"]
-        ID["ms-identidad<br/>:8081"]
-        CA["ms-catalogo<br/>:8082"]
-        OR["ms-ordenes<br/>:8083"]
-        CI["ms-citas<br/>:8084"]
-        CL["ms-clinico<br/>:8085"]
+        GW[api-gateway<br/>:8080<br/>rutas · JWT · CORS · Swagger]
+        ID[ms-identidad<br/>:8081]
+        CA[ms-catalogo<br/>:8082]
+        OR[ms-ordenes<br/>:8083]
     end
 
     GW --> ID
     GW --> CA
     GW --> OR
-    GW --> CI
-    GW --> CL
-    CI -->|"consulta nombre y precio"| CA
-    OR -->|"consulta precios y descuenta cupos"| CA
+    OR -- consulta precios y<br/>descuenta cupos --> CA
 
     ID --- DB1[(nutrivida_identidad)]
     CA --- DB2[(nutrivida_catalogo)]
     OR --- DB3[(nutrivida_ordenes)]
-    CI --- DB4[(nutrivida_citas)]
-    CL --- DB5[(nutrivida_clinico)]
 ```
 
 | Servicio | Puerto | Base de datos | Responsabilidad |
@@ -44,12 +37,8 @@ flowchart LR
 | **ms-identidad** | 8081 | `nutrivida_identidad` | Registro de pacientes, login, emisión y renovación de JWT, cierre de sesión y CRUD de usuarios. |
 | **ms-catalogo** | 8082 | `nutrivida_catalogo` | CRUD de categorías y servicios (consultas, planes, evaluaciones y talleres), precios con descuento y cupos. |
 | **ms-ordenes** | 8083 | `nutrivida_ordenes` | Carrito de atenciones, pago simulado y órdenes. Se comunica con ms-catalogo por HTTP. |
-| **ms-citas** | 8084 | `nutrivida_citas` | Nutricionistas con su jornada y citas: cada rol ve solo lo suyo. Consulta precios en ms-catalogo. |
-| **ms-clinico** | 8085 | `nutrivida_clinico` | Fichas clínicas: mediciones, IMC, progreso y plan alimenticio. Solo el paciente y su nutricionista. |
 
 **Seguridad en dos capas:** el gateway rechaza las peticiones sin token o con un token inválido o vencido. Cada microservicio vuelve a validar el token y aplica los permisos por rol (`@PreAuthorize`).
-
-**Llamadas entre servicios:** cuando ms-ordenes necesita descontar cupos en ms-catalogo, no reenvía el token del paciente: firma su propio token de servicio (1 minuto, rol `SERVICIO`, que ningún usuario puede tener). Ese endpoint solo acepta ese rol o al administrador, y el gateway lo bloquea desde el navegador.
 
 ---
 
@@ -83,12 +72,12 @@ Las credenciales **no están en el código**. Cada servicio las lee desde variab
 
 | Variable | Obligatoria | Valor por defecto | Usada por |
 |---|---|---|---|
-| `DB_PASSWORD` | Sí | — | identidad, catálogo, órdenes, citas, clínico |
-| `JWT_SECRET` | Sí (mín. 32 caracteres, **igual en los 6 servicios**) | — | los 6 servicios |
+| `DB_PASSWORD` | Sí | — | identidad, catálogo, órdenes |
+| `JWT_SECRET` | Sí (mín. 32 caracteres, **igual en los 4 servicios**) | — | los 4 servicios |
 | `DB_USER` | No | `root` | identidad, catálogo, órdenes |
 | `DB_HOST` | No | `localhost` | identidad, catálogo, órdenes |
 | `DB_PORT` | No | `3306` | identidad, catálogo, órdenes |
-| `CATALOGO_URL` | No | `http://localhost:8082` | órdenes, citas |
+| `CATALOGO_URL` | No | `http://localhost:8082` | órdenes |
 
 **En Windows (una sola vez, en cmd):**
 
@@ -111,8 +100,6 @@ Después, **cierra y vuelve a abrir IntelliJ** para que tome las variables.
    - `MsIdentidadApplication`
    - `MsCatalogoApplication`
    - `MsOrdenesApplication`
-   - `MsCitasApplication`
-   - `MsClinicoApplication`
    - `ApiGatewayApplication`
 
 **Por línea de comandos** (desde la carpeta de cada servicio):
@@ -132,8 +119,6 @@ mvnw.cmd spring-boot:run      # Windows
 | ms-identidad | http://localhost:8081/swagger-ui/index.html |
 | ms-catalogo | http://localhost:8082/swagger-ui/index.html |
 | ms-ordenes | http://localhost:8083/swagger-ui/index.html |
-| ms-citas | http://localhost:8084/swagger-ui/index.html |
-| ms-clinico | http://localhost:8085/swagger-ui/index.html |
 
 **Probar endpoints protegidos:** hacer login en `POST /api/v1/auth/login`, copiar el `accessToken`, presionar **Authorize** y pegarlo. El token dura **15 minutos**; para renovarlo se usa `POST /api/v1/auth/refresh` con el `refreshToken` (válido por 7 días y de un solo uso).
 
@@ -184,7 +169,7 @@ Todas las rutas se consumen a través del gateway: `http://localhost:8080`.
 | GET | `/api/v1/servicios?categoriaId=&soloActivos=` | Público | Lista servicios con precio final |
 | GET | `/api/v1/servicios/{codigo}` | Público | Ver un servicio |
 | POST · PUT · DELETE | `/api/v1/servicios[/{codigo}]` | Administrador | Gestionar servicios |
-| PATCH | `/api/v1/servicios/{codigo}/cupos` | Interno: ms-ordenes (rol `SERVICIO`) o Administrador | Descuenta cupos de un taller. El gateway lo bloquea desde afuera |
+| PATCH | `/api/v1/servicios/{codigo}/cupos` | Con sesión | Descuenta cupos de un taller (lo usa ms-ordenes) |
 
 ### ms-ordenes
 
@@ -197,35 +182,6 @@ Todas las rutas se consumen a través del gateway: `http://localhost:8080`.
 | POST | `/api/v1/carrito/checkout` | Paciente | Pagar (simulado) y generar la orden |
 | GET | `/api/v1/ordenes` | Con sesión | Paciente: sus órdenes · Administrador y Recepción: todas |
 | GET | `/api/v1/ordenes/{id}` | Dueño, Administrador o Recepción | Detalle de una orden |
-
-### ms-citas
-
-| Método | Ruta | Acceso | Descripción |
-|---|---|---|---|
-| GET | `/api/v1/nutricionistas` | Con sesión | Lista nutricionistas con especialidad, días y horario |
-| GET | `/api/v1/nutricionistas/{id}` | Con sesión | Ver un nutricionista |
-| POST · DELETE | `/api/v1/nutricionistas[/{id}]` | Administrador | Gestionar nutricionistas |
-| GET | `/api/v1/citas` | Con sesión | Paciente: sus citas · Nutricionista: su agenda · Administrador y Recepción: todas |
-| GET | `/api/v1/citas/{id}` | Su paciente, su nutricionista o el personal | Ver una cita |
-| GET | `/api/v1/citas/disponibilidad?fecha=&nutricionista=&codigoServicio=` | Con sesión | Bloques del día con `disponible` y motivo (muy próximo, ocupado, sin cupos) |
-| POST | `/api/v1/citas` | Paciente (para sí), Administrador o Recepción (con `pacienteCorreo`) | Agendar con pago en clínica; sin preferencia se asigna un nutricionista libre |
-| PATCH | `/api/v1/citas/{id}/confirmar` | Su paciente o el personal | Confirmar asistencia antes del plazo |
-| PATCH | `/api/v1/citas/{id}/cancelar` | Su paciente (hasta 2 h antes) o el personal | Cancelar; informa el reembolso si estaba pagada online |
-| PATCH | `/api/v1/citas/{id}/reprogramar` | Su paciente (hasta 2 h antes) o el personal | Nueva fecha, hora o nutricionista, conservando el pago |
-| PATCH | `/api/v1/citas/{id}/asistencia` | Su nutricionista, Administrador o Recepción | `ATENDIDA` o `INASISTENCIA` de una cita confirmada |
-| DELETE | `/api/v1/citas/{id}` | Administrador | Eliminar el registro de una cita |
-
-### ms-clinico
-
-| Método | Ruta | Acceso | Descripción |
-|---|---|---|---|
-| GET | `/api/v1/fichas/mia` | Paciente | Su ficha: mediciones con IMC, progreso y plan alimenticio |
-| GET | `/api/v1/fichas` | Nutricionista | Mis pacientes (fichas asignadas) |
-| GET | `/api/v1/fichas/{pacienteCorreo}` | El paciente o su nutricionista | Ver una ficha |
-| POST | `/api/v1/fichas` | Nutricionista | Abrir la ficha de un paciente (queda asignado) |
-| PUT | `/api/v1/fichas/{pacienteCorreo}` | Su nutricionista | Objetivo, antecedentes y plan alimenticio |
-| POST | `/api/v1/fichas/{pacienteCorreo}/mediciones` | Su nutricionista | Registrar peso, talla y cintura |
-| DELETE | `/api/v1/fichas/{pacienteCorreo}/mediciones/{id}` | Su nutricionista | Eliminar una medición |
 
 ---
 
@@ -250,20 +206,6 @@ Todas las rutas se consumen a través del gateway: `http://localhost:8080`.
 - Tarjeta validada (16 dígitos, MM/AA no vencido, CVV de 3 dígitos); solo se guardan los últimos 4 dígitos.
 - Si ms-catalogo no responde, se informa con un error 503.
 
-**Citas**
-- Solo se agenda dentro de la jornada del nutricionista (días y horario, en bloques de 1 hora) y sin otra cita activa suya a la misma hora. Sin preferencia, se asigna el primer nutricionista libre. Los talleres se controlan por cupos.
-- No se reserva, cancela ni reprograma en línea con menos de **2 h** de anticipación (RN-03, RN-09).
-- Con pago en clínica y 24 h o más de anticipación, la cita queda **por confirmar** hasta 24 h antes; con menos, queda **confirmada** (RN-02, RN-07).
-- Cada 15 minutos una tarea automática **cancela las citas no confirmadas** cuyo plazo venció (RN-06).
-- Reprogramar conserva el pago; una cita pagada sigue confirmada. Cancelar una cita pagada online informa el reembolso del 100 % (RN-11).
-- El paciente siempre agenda a su nombre (el correo sale del token); el precio y el nombre del servicio los define ms-catalogo. El cliente no puede enviar estados ni montos.
-- Cada rol ve solo sus citas: el paciente las suyas, el nutricionista su agenda y el personal todas.
-
-**Fichas clínicas**
-- Privacidad de datos de salud: la ficha solo la ven el paciente y su nutricionista asignado. Administración y recepción no ven datos clínicos.
-- Solo el nutricionista asignado registra mediciones o edita el plan; el paciente solo consulta.
-- Mediciones validadas (peso 2–400 kg, talla 40–250 cm, cintura 30–250 cm, fecha no futura). El IMC y su clasificación (OMS) se calculan al responder, no se guardan (3FN).
-
 ---
 
 ## Pruebas unitarias
@@ -273,16 +215,13 @@ Pruebas de las reglas de negocio con **JUnit + Mockito** (sin base de datos ni s
 | Servicio | Clases de prueba | Pruebas |
 |---|---|---|
 | ms-identidad | `RunTest`, `UsuarioServiceTest` | 7 |
-| ms-catalogo | `ServicioTest`, `ServicioServiceTest`, `CategoriaServiceTest`, `ServicioControllerSeguridadTest` | 10 |
-| ms-ordenes | `CarritoServiceTest`, `OrdenServiceTest`, `TokenServicioTest` | 10 |
-| ms-citas | `CitaServiceTest` | 15 |
-| ms-clinico | `ReglasClinicasTest`, `FichaServiceTest` | 9 |
+| ms-catalogo | `ServicioTest`, `ServicioServiceTest`, `CategoriaServiceTest` | 7 |
+| ms-ordenes | `CarritoServiceTest`, `OrdenServiceTest` | 8 |
 
 **Ejecutar:** en IntelliJ, clic derecho sobre `src/test/java` de cada servicio → **Run 'All Tests'**, o por consola:
 
 ```bash
-./mvnw test        # Linux / macOS
-mvnw.cmd test      # Windows
+mvnw.cmd test
 ```
 
 ---
@@ -295,8 +234,6 @@ NutriVida-Backend/
 ├── ms-identidad/     # Usuarios, login y JWT
 ├── ms-catalogo/      # Categorías y servicios
 ├── ms-ordenes/       # Carrito, pago y órdenes
-├── ms-citas/         # Nutricionistas y agenda de citas
-├── ms-clinico/       # Fichas clínicas, mediciones y plan alimenticio
 └── README.md
 ```
 

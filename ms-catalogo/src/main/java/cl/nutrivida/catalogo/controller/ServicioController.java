@@ -60,10 +60,8 @@ public class ServicioController {
         service.eliminar(codigo);
     }
 
-    @Operation(summary = "Reservar cupos de un taller",
-            description = "Uso interno: solo ms-ordenes (token de servicio) o un administrador. El gateway lo bloquea desde afuera.")
+    @Operation(summary = "Reservar cupos de un taller", description = "Requiere sesión. Lo usa ms-ordenes al pagar.")
     @PatchMapping("/{codigo}/cupos")
-    @PreAuthorize("hasAnyRole('SERVICIO', 'ADMINISTRADOR')")
     public ServicioResponse reservarCupos(@PathVariable("codigo") String codigo, @Valid @RequestBody CuposRequest req) {
         return service.reservarCupos(codigo, req.cantidad());
     }
