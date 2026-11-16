@@ -19,16 +19,20 @@ flowchart LR
         ID[ms-identidad<br/>:8081]
         CA[ms-catalogo<br/>:8082]
         OR[ms-ordenes<br/>:8083]
+        CI[ms-citas<br/>:8084]
     end
 
     GW --> ID
     GW --> CA
     GW --> OR
+    GW --> CI
+    CI -- consulta nombre y precio --> CA
     OR -- consulta precios y<br/>descuenta cupos --> CA
 
     ID --- DB1[(nutrivida_identidad)]
     CA --- DB2[(nutrivida_catalogo)]
     OR --- DB3[(nutrivida_ordenes)]
+    CI --- DB4[(nutrivida_citas)]
 ```
 
 | Servicio | Puerto | Base de datos | Responsabilidad |
@@ -37,6 +41,7 @@ flowchart LR
 | **ms-identidad** | 8081 | `nutrivida_identidad` | Registro de pacientes, login, emisión y renovación de JWT, cierre de sesión y CRUD de usuarios. |
 | **ms-catalogo** | 8082 | `nutrivida_catalogo` | CRUD de categorías y servicios (consultas, planes, evaluaciones y talleres), precios con descuento y cupos. |
 | **ms-ordenes** | 8083 | `nutrivida_ordenes` | Carrito de atenciones, pago simulado y órdenes. Se comunica con ms-catalogo por HTTP. |
+| **ms-citas** | 8084 | `nutrivida_citas` | Nutricionistas con su jornada y citas: cada rol ve solo lo suyo. Consulta precios en ms-catalogo. |
 
 **Seguridad en dos capas:** el gateway rechaza las peticiones sin token o con un token inválido o vencido. Cada microservicio vuelve a validar el token y aplica los permisos por rol (`@PreAuthorize`).
 
@@ -72,12 +77,12 @@ Las credenciales **no están en el código**. Cada servicio las lee desde variab
 
 | Variable | Obligatoria | Valor por defecto | Usada por |
 |---|---|---|---|
-| `DB_PASSWORD` | Sí | — | identidad, catálogo, órdenes |
-| `JWT_SECRET` | Sí (mín. 32 caracteres, **igual en los 4 servicios**) | — | los 4 servicios |
+| `DB_PASSWORD` | Sí | — | identidad, catálogo, órdenes, citas |
+| `JWT_SECRET` | Sí (mín. 32 caracteres, **igual en los 5 servicios**) | — | los 5 servicios |
 | `DB_USER` | No | `root` | identidad, catálogo, órdenes |
 | `DB_HOST` | No | `localhost` | identidad, catálogo, órdenes |
 | `DB_PORT` | No | `3306` | identidad, catálogo, órdenes |
-| `CATALOGO_URL` | No | `http://localhost:8082` | órdenes |
+| `CATALOGO_URL` | No | `http://localhost:8082` | órdenes, citas |
 
 **En Windows (una sola vez, en cmd):**
 
@@ -100,6 +105,7 @@ Después, **cierra y vuelve a abrir IntelliJ** para que tome las variables.
    - `MsIdentidadApplication`
    - `MsCatalogoApplication`
    - `MsOrdenesApplication`
+   - `MsCitasApplication`
    - `ApiGatewayApplication`
 
 **Por línea de comandos** (desde la carpeta de cada servicio):
@@ -119,6 +125,7 @@ mvnw.cmd spring-boot:run      # Windows
 | ms-identidad | http://localhost:8081/swagger-ui/index.html |
 | ms-catalogo | http://localhost:8082/swagger-ui/index.html |
 | ms-ordenes | http://localhost:8083/swagger-ui/index.html |
+| ms-citas | http://localhost:8084/swagger-ui/index.html |
 
 **Probar endpoints protegidos:** hacer login en `POST /api/v1/auth/login`, copiar el `accessToken`, presionar **Authorize** y pegarlo. El token dura **15 minutos**; para renovarlo se usa `POST /api/v1/auth/refresh` con el `refreshToken` (válido por 7 días y de un solo uso).
 
@@ -183,6 +190,18 @@ Todas las rutas se consumen a través del gateway: `http://localhost:8080`.
 | GET | `/api/v1/ordenes` | Con sesión | Paciente: sus órdenes · Administrador y Recepción: todas |
 | GET | `/api/v1/ordenes/{id}` | Dueño, Administrador o Recepción | Detalle de una orden |
 
+### ms-citas
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| GET | `/api/v1/nutricionistas` | Con sesión | Lista nutricionistas con especialidad, días y horario |
+| GET | `/api/v1/nutricionistas/{id}` | Con sesión | Ver un nutricionista |
+| POST · DELETE | `/api/v1/nutricionistas[/{id}]` | Administrador | Gestionar nutricionistas |
+| GET | `/api/v1/citas` | Con sesión | Paciente: sus citas · Nutricionista: su agenda · Administrador y Recepción: todas |
+| GET | `/api/v1/citas/{id}` | Su paciente, su nutricionista o el personal | Ver una cita |
+| POST | `/api/v1/citas` | Paciente (para sí), Administrador o Recepción (con `pacienteCorreo`) | Agendar: precio desde ms-catalogo, queda por confirmar y con pago pendiente |
+| DELETE | `/api/v1/citas/{id}` | Administrador | Eliminar el registro de una cita |
+
 ---
 
 ## Reglas de negocio principales
@@ -205,6 +224,12 @@ Todas las rutas se consumen a través del gateway: `http://localhost:8080`.
 - Al pagar se vuelve a verificar todo en el catálogo: si una atención ya no está disponible, **no se cobra nada**.
 - Tarjeta validada (16 dígitos, MM/AA no vencido, CVV de 3 dígitos); solo se guardan los últimos 4 dígitos.
 - Si ms-catalogo no responde, se informa con un error 503.
+
+**Citas**
+- Solo se agenda dentro de la jornada del nutricionista (días y horario) y sin otra cita activa suya a la misma hora.
+- El paciente siempre agenda a su nombre (el correo sale del token); el precio y el nombre del servicio los define ms-catalogo.
+- Una cita nueva queda **por confirmar** y con **pago pendiente**: el cliente no puede enviar estados ni montos.
+- Cada rol ve solo sus citas: el paciente las suyas, el nutricionista su agenda y el personal todas.
 
 ---
 
