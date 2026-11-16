@@ -81,7 +81,7 @@ public class OrdenService {
         }
 
         // 5. Descontar cupos de los talleres en ms-catalogo
-        cuposPedidos.forEach((codigo, cantidad) -> catalogo.reservarCupos(codigo, cantidad));
+        cuposPedidos.forEach((codigo, cantidad) -> catalogo.reservarCupos(codigo, cantidad, jwt.getTokenValue()));
 
         // 6. Crear la orden con los precios ACTUALES del catálogo
         Orden orden = new Orden();
