@@ -36,6 +36,10 @@ spring:
               uri: http://localhost:8084
               predicates:
                 - Path=/api/v1/citas/**,/api/v1/nutricionistas/**
+            - id: clinico
+              uri: http://localhost:8085
+              predicates:
+                - Path=/api/v1/fichas/**
             # ---------- Documentación Swagger de cada servicio ----------
             - id: identidad-docs
               uri: http://localhost:8081
@@ -61,6 +65,12 @@ spring:
                 - Path=/citas/v3/api-docs
               filters:
                 - StripPrefix=1
+            - id: clinico-docs
+              uri: http://localhost:8085
+              predicates:
+                - Path=/clinico/v3/api-docs
+              filters:
+                - StripPrefix=1
 
 app:
   jwt:
@@ -79,3 +89,5 @@ springdoc:
         url: /ordenes/v3/api-docs
       - name: ms-citas
         url: /citas/v3/api-docs
+      - name: ms-clinico
+        url: /clinico/v3/api-docs

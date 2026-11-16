@@ -20,12 +20,14 @@ flowchart LR
         CA[ms-catalogo<br/>:8082]
         OR[ms-ordenes<br/>:8083]
         CI[ms-citas<br/>:8084]
+        CL[ms-clinico<br/>:8085]
     end
 
     GW --> ID
     GW --> CA
     GW --> OR
     GW --> CI
+    GW --> CL
     CI -- consulta nombre y precio --> CA
     OR -- consulta precios y<br/>descuenta cupos --> CA
 
@@ -33,6 +35,7 @@ flowchart LR
     CA --- DB2[(nutrivida_catalogo)]
     OR --- DB3[(nutrivida_ordenes)]
     CI --- DB4[(nutrivida_citas)]
+    CL --- DB5[(nutrivida_clinico)]
 ```
 
 | Servicio | Puerto | Base de datos | Responsabilidad |
@@ -42,6 +45,7 @@ flowchart LR
 | **ms-catalogo** | 8082 | `nutrivida_catalogo` | CRUD de categorías y servicios (consultas, planes, evaluaciones y talleres), precios con descuento y cupos. |
 | **ms-ordenes** | 8083 | `nutrivida_ordenes` | Carrito de atenciones, pago simulado y órdenes. Se comunica con ms-catalogo por HTTP. |
 | **ms-citas** | 8084 | `nutrivida_citas` | Nutricionistas con su jornada y citas: cada rol ve solo lo suyo. Consulta precios en ms-catalogo. |
+| **ms-clinico** | 8085 | `nutrivida_clinico` | Fichas clínicas: mediciones, IMC, progreso y plan alimenticio. Solo el paciente y su nutricionista. |
 
 **Seguridad en dos capas:** el gateway rechaza las peticiones sin token o con un token inválido o vencido. Cada microservicio vuelve a validar el token y aplica los permisos por rol (`@PreAuthorize`).
 
@@ -79,8 +83,8 @@ Las credenciales **no están en el código**. Cada servicio las lee desde variab
 
 | Variable | Obligatoria | Valor por defecto | Usada por |
 |---|---|---|---|
-| `DB_PASSWORD` | Sí | — | identidad, catálogo, órdenes, citas |
-| `JWT_SECRET` | Sí (mín. 32 caracteres, **igual en los 5 servicios**) | — | los 5 servicios |
+| `DB_PASSWORD` | Sí | — | identidad, catálogo, órdenes, citas, clínico |
+| `JWT_SECRET` | Sí (mín. 32 caracteres, **igual en los 6 servicios**) | — | los 6 servicios |
 | `DB_USER` | No | `root` | identidad, catálogo, órdenes |
 | `DB_HOST` | No | `localhost` | identidad, catálogo, órdenes |
 | `DB_PORT` | No | `3306` | identidad, catálogo, órdenes |
@@ -108,6 +112,7 @@ Después, **cierra y vuelve a abrir IntelliJ** para que tome las variables.
    - `MsCatalogoApplication`
    - `MsOrdenesApplication`
    - `MsCitasApplication`
+   - `MsClinicoApplication`
    - `ApiGatewayApplication`
 
 **Por línea de comandos** (desde la carpeta de cada servicio):
@@ -128,6 +133,7 @@ mvnw.cmd spring-boot:run      # Windows
 | ms-catalogo | http://localhost:8082/swagger-ui/index.html |
 | ms-ordenes | http://localhost:8083/swagger-ui/index.html |
 | ms-citas | http://localhost:8084/swagger-ui/index.html |
+| ms-clinico | http://localhost:8085/swagger-ui/index.html |
 
 **Probar endpoints protegidos:** hacer login en `POST /api/v1/auth/login`, copiar el `accessToken`, presionar **Authorize** y pegarlo. El token dura **15 minutos**; para renovarlo se usa `POST /api/v1/auth/refresh` con el `refreshToken` (válido por 7 días y de un solo uso).
 
@@ -209,6 +215,18 @@ Todas las rutas se consumen a través del gateway: `http://localhost:8080`.
 | PATCH | `/api/v1/citas/{id}/asistencia` | Su nutricionista, Administrador o Recepción | `ATENDIDA` o `INASISTENCIA` de una cita confirmada |
 | DELETE | `/api/v1/citas/{id}` | Administrador | Eliminar el registro de una cita |
 
+### ms-clinico
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| GET | `/api/v1/fichas/mia` | Paciente | Su ficha: mediciones con IMC, progreso y plan alimenticio |
+| GET | `/api/v1/fichas` | Nutricionista | Mis pacientes (fichas asignadas) |
+| GET | `/api/v1/fichas/{pacienteCorreo}` | El paciente o su nutricionista | Ver una ficha |
+| POST | `/api/v1/fichas` | Nutricionista | Abrir la ficha de un paciente (queda asignado) |
+| PUT | `/api/v1/fichas/{pacienteCorreo}` | Su nutricionista | Objetivo, antecedentes y plan alimenticio |
+| POST | `/api/v1/fichas/{pacienteCorreo}/mediciones` | Su nutricionista | Registrar peso, talla y cintura |
+| DELETE | `/api/v1/fichas/{pacienteCorreo}/mediciones/{id}` | Su nutricionista | Eliminar una medición |
+
 ---
 
 ## Reglas de negocio principales
@@ -241,6 +259,11 @@ Todas las rutas se consumen a través del gateway: `http://localhost:8080`.
 - El paciente siempre agenda a su nombre (el correo sale del token); el precio y el nombre del servicio los define ms-catalogo. El cliente no puede enviar estados ni montos.
 - Cada rol ve solo sus citas: el paciente las suyas, el nutricionista su agenda y el personal todas.
 
+**Fichas clínicas**
+- Privacidad de datos de salud: la ficha solo la ven el paciente y su nutricionista asignado. Administración y recepción no ven datos clínicos.
+- Solo el nutricionista asignado registra mediciones o edita el plan; el paciente solo consulta.
+- Mediciones validadas (peso 2–400 kg, talla 40–250 cm, cintura 30–250 cm, fecha no futura). El IMC y su clasificación (OMS) se calculan al responder, no se guardan (3FN).
+
 ---
 
 ## Pruebas unitarias
@@ -254,6 +277,7 @@ Pruebas de las reglas de negocio con **JUnit + Mockito** (sin base de datos ni s
 | ms-ordenes | `CarritoServiceTest`, `OrdenServiceTest`, `TokenServicioTest` | 10 |
 | ms-catalogo | `ServicioTest`, `ServicioServiceTest`, `CategoriaServiceTest` | 7 |
 | ms-ordenes | `CarritoServiceTest`, `OrdenServiceTest` | 8 |
+| ms-clinico | `ReglasClinicasTest`, `FichaServiceTest` | 9 |
 | ms-citas | `CitaServiceTest` | 15 |
 
 **Ejecutar:** en IntelliJ, clic derecho sobre `src/test/java` de cada servicio → **Run 'All Tests'**, o por consola:
@@ -272,6 +296,7 @@ NutriVida-Backend/
 ├── ms-identidad/     # Usuarios, login y JWT
 ├── ms-catalogo/      # Categorías y servicios
 ├── ms-ordenes/       # Carrito, pago y órdenes
+├── ms-clinico/       # Fichas clínicas, mediciones y plan alimenticio
 └── README.md
 ```
 

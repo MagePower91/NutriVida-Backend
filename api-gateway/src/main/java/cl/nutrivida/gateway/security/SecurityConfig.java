@@ -39,7 +39,7 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.GET, "/api/v1/servicios/**", "/api/v1/categorias/**").permitAll()
                         .pathMatchers("/swagger-ui.html", "/swagger-ui/**", "/webjars/**", "/v3/api-docs/**",
                                 "/identidad/v3/api-docs", "/catalogo/v3/api-docs", "/ordenes/v3/api-docs",
-                                "/citas/v3/api-docs").permitAll()
+                                "/citas/v3/api-docs", "/clinico/v3/api-docs").permitAll()
                         .anyExchange().authenticated())
                 .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()));
         return http.build();
