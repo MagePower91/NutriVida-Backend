@@ -275,15 +275,14 @@ Pruebas de las reglas de negocio con **JUnit + Mockito** (sin base de datos ni s
 | ms-identidad | `RunTest`, `UsuarioServiceTest` | 7 |
 | ms-catalogo | `ServicioTest`, `ServicioServiceTest`, `CategoriaServiceTest`, `ServicioControllerSeguridadTest` | 10 |
 | ms-ordenes | `CarritoServiceTest`, `OrdenServiceTest`, `TokenServicioTest` | 10 |
-| ms-catalogo | `ServicioTest`, `ServicioServiceTest`, `CategoriaServiceTest` | 7 |
-| ms-ordenes | `CarritoServiceTest`, `OrdenServiceTest` | 8 |
-| ms-clinico | `ReglasClinicasTest`, `FichaServiceTest` | 9 |
 | ms-citas | `CitaServiceTest` | 15 |
+| ms-clinico | `ReglasClinicasTest`, `FichaServiceTest` | 9 |
 
 **Ejecutar:** en IntelliJ, clic derecho sobre `src/test/java` de cada servicio → **Run 'All Tests'**, o por consola:
 
 ```bash
-mvnw.cmd test
+./mvnw test        # Linux / macOS
+mvnw.cmd test      # Windows
 ```
 
 ---
@@ -296,6 +295,7 @@ NutriVida-Backend/
 ├── ms-identidad/     # Usuarios, login y JWT
 ├── ms-catalogo/      # Categorías y servicios
 ├── ms-ordenes/       # Carrito, pago y órdenes
+├── ms-citas/         # Nutricionistas y agenda de citas
 ├── ms-clinico/       # Fichas clínicas, mediciones y plan alimenticio
 └── README.md
 ```
