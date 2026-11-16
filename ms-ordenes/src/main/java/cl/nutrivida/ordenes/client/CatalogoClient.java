@@ -3,6 +3,7 @@
 package cl.nutrivida.ordenes.client;
 
 import cl.nutrivida.ordenes.exception.ApiException;
+import cl.nutrivida.ordenes.security.TokenServicio;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -26,8 +27,10 @@ public class CatalogoClient {
             Integer sesiones, Integer cupos, String descripcion, boolean activo) { }
 
     private final RestClient http;
+    private final TokenServicio tokenServicio;
 
-    public CatalogoClient(@Value("${app.servicios.catalogo-url}") String catalogoUrl) {
+    public CatalogoClient(@Value("${app.servicios.catalogo-url}") String catalogoUrl, TokenServicio tokenServicio) {
+        this.tokenServicio = tokenServicio;
         this.http = RestClient.builder()
                 .baseUrl(catalogoUrl)
                 .requestFactory(new JdkClientHttpRequestFactory())   // soporta PATCH
@@ -47,12 +50,12 @@ public class CatalogoClient {
         }
     }
 
-    /** Descuenta cupos de un taller. Reenvía el token del paciente porque el endpoint exige sesión. */
-    public void reservarCupos(String codigo, int cantidad, String tokenUsuario) {
+    /** Descuenta cupos de un taller. Usa el token de servicio de ms-ordenes (rol SERVICIO), no el del paciente. */
+    public void reservarCupos(String codigo, int cantidad) {
         try {
             http.patch()
                     .uri("/api/v1/servicios/{codigo}/cupos", codigo)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUsuario)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenServicio.emitir())
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("cantidad", cantidad))
                     .retrieve()
