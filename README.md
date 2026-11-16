@@ -45,6 +45,8 @@ flowchart LR
 
 **Seguridad en dos capas:** el gateway rechaza las peticiones sin token o con un token inválido o vencido. Cada microservicio vuelve a validar el token y aplica los permisos por rol (`@PreAuthorize`).
 
+**Llamadas entre servicios:** cuando ms-ordenes necesita descontar cupos en ms-catalogo, no reenvía el token del paciente: firma su propio token de servicio (1 minuto, rol `SERVICIO`, que ningún usuario puede tener). Ese endpoint solo acepta ese rol o al administrador, y el gateway lo bloquea desde el navegador.
+
 ---
 
 ## Tecnologías
@@ -176,7 +178,7 @@ Todas las rutas se consumen a través del gateway: `http://localhost:8080`.
 | GET | `/api/v1/servicios?categoriaId=&soloActivos=` | Público | Lista servicios con precio final |
 | GET | `/api/v1/servicios/{codigo}` | Público | Ver un servicio |
 | POST · PUT · DELETE | `/api/v1/servicios[/{codigo}]` | Administrador | Gestionar servicios |
-| PATCH | `/api/v1/servicios/{codigo}/cupos` | Con sesión | Descuenta cupos de un taller (lo usa ms-ordenes) |
+| PATCH | `/api/v1/servicios/{codigo}/cupos` | Interno: ms-ordenes (rol `SERVICIO`) o Administrador | Descuenta cupos de un taller. El gateway lo bloquea desde afuera |
 
 ### ms-ordenes
 
@@ -240,8 +242,8 @@ Pruebas de las reglas de negocio con **JUnit + Mockito** (sin base de datos ni s
 | Servicio | Clases de prueba | Pruebas |
 |---|---|---|
 | ms-identidad | `RunTest`, `UsuarioServiceTest` | 7 |
-| ms-catalogo | `ServicioTest`, `ServicioServiceTest`, `CategoriaServiceTest` | 7 |
-| ms-ordenes | `CarritoServiceTest`, `OrdenServiceTest` | 8 |
+| ms-catalogo | `ServicioTest`, `ServicioServiceTest`, `CategoriaServiceTest`, `ServicioControllerSeguridadTest` | 10 |
+| ms-ordenes | `CarritoServiceTest`, `OrdenServiceTest`, `TokenServicioTest` | 10 |
 
 **Ejecutar:** en IntelliJ, clic derecho sobre `src/test/java` de cada servicio → **Run 'All Tests'**, o por consola:
 
