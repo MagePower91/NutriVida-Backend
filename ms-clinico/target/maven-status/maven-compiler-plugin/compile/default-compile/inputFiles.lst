@@ -1,0 +1,15 @@
+/Users/anamariavidal/IdeaProjects/NutriVida-Backend/ms-clinico/src/main/java/cl/nutrivida/clinico/MsClinicoApplication.java
+/Users/anamariavidal/IdeaProjects/NutriVida-Backend/ms-clinico/src/main/java/cl/nutrivida/clinico/config/DataSeeder.java
+/Users/anamariavidal/IdeaProjects/NutriVida-Backend/ms-clinico/src/main/java/cl/nutrivida/clinico/config/OpenApiConfig.java
+/Users/anamariavidal/IdeaProjects/NutriVida-Backend/ms-clinico/src/main/java/cl/nutrivida/clinico/config/RelojConfig.java
+/Users/anamariavidal/IdeaProjects/NutriVida-Backend/ms-clinico/src/main/java/cl/nutrivida/clinico/controller/FichaController.java
+/Users/anamariavidal/IdeaProjects/NutriVida-Backend/ms-clinico/src/main/java/cl/nutrivida/clinico/dto/FichaDtos.java
+/Users/anamariavidal/IdeaProjects/NutriVida-Backend/ms-clinico/src/main/java/cl/nutrivida/clinico/exception/ApiException.java
+/Users/anamariavidal/IdeaProjects/NutriVida-Backend/ms-clinico/src/main/java/cl/nutrivida/clinico/exception/GlobalExceptionHandler.java
+/Users/anamariavidal/IdeaProjects/NutriVida-Backend/ms-clinico/src/main/java/cl/nutrivida/clinico/model/FichaClinica.java
+/Users/anamariavidal/IdeaProjects/NutriVida-Backend/ms-clinico/src/main/java/cl/nutrivida/clinico/model/Medicion.java
+/Users/anamariavidal/IdeaProjects/NutriVida-Backend/ms-clinico/src/main/java/cl/nutrivida/clinico/repository/FichaClinicaRepository.java
+/Users/anamariavidal/IdeaProjects/NutriVida-Backend/ms-clinico/src/main/java/cl/nutrivida/clinico/security/JwtConfig.java
+/Users/anamariavidal/IdeaProjects/NutriVida-Backend/ms-clinico/src/main/java/cl/nutrivida/clinico/security/SecurityConfig.java
+/Users/anamariavidal/IdeaProjects/NutriVida-Backend/ms-clinico/src/main/java/cl/nutrivida/clinico/service/FichaService.java
+/Users/anamariavidal/IdeaProjects/NutriVida-Backend/ms-clinico/src/main/java/cl/nutrivida/clinico/service/ReglasClinicas.java
