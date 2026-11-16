@@ -12,15 +12,15 @@ Arquitectura de **microservicios con Spring Boot**, autenticación con **JWT** (
 
 ```mermaid
 flowchart LR
-    FE[Frontend React<br/>localhost:5173] --> GW
+    FE["Frontend React<br/>localhost:5173"] --> GW
 
     subgraph Backend
-        GW[api-gateway<br/>:8080<br/>rutas · JWT · CORS · Swagger]
-        ID[ms-identidad<br/>:8081]
-        CA[ms-catalogo<br/>:8082]
-        OR[ms-ordenes<br/>:8083]
-        CI[ms-citas<br/>:8084]
-        CL[ms-clinico<br/>:8085]
+        GW["api-gateway<br/>:8080<br/>rutas · JWT · CORS · Swagger"]
+        ID["ms-identidad<br/>:8081"]
+        CA["ms-catalogo<br/>:8082"]
+        OR["ms-ordenes<br/>:8083"]
+        CI["ms-citas<br/>:8084"]
+        CL["ms-clinico<br/>:8085"]
     end
 
     GW --> ID
@@ -28,8 +28,8 @@ flowchart LR
     GW --> OR
     GW --> CI
     GW --> CL
-    CI -- consulta nombre y precio --> CA
-    OR -- consulta precios y<br/>descuenta cupos --> CA
+    CI -->|"consulta nombre y precio"| CA
+    OR -->|"consulta precios y descuenta cupos"| CA
 
     ID --- DB1[(nutrivida_identidad)]
     CA --- DB2[(nutrivida_catalogo)]
