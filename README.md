@@ -12,15 +12,15 @@ Arquitectura de **microservicios con Spring Boot**, autenticación con **JWT** (
 
 ```mermaid
 flowchart LR
-    FE[Frontend React<br/>localhost:5173] --> GW
+    FE["Frontend React<br/>localhost:5173"] --> GW
 
     subgraph Backend
-        GW[api-gateway<br/>:8080<br/>rutas · JWT · CORS · Swagger]
-        ID[ms-identidad<br/>:8081]
-        CA[ms-catalogo<br/>:8082]
-        OR[ms-ordenes<br/>:8083]
-        CI[ms-citas<br/>:8084]
-        CL[ms-clinico<br/>:8085]
+        GW["api-gateway<br/>:8080<br/>rutas · JWT · CORS · Swagger"]
+        ID["ms-identidad<br/>:8081"]
+        CA["ms-catalogo<br/>:8082"]
+        OR["ms-ordenes<br/>:8083"]
+        CI["ms-citas<br/>:8084"]
+        CL["ms-clinico<br/>:8085"]
     end
 
     GW --> ID
@@ -28,8 +28,8 @@ flowchart LR
     GW --> OR
     GW --> CI
     GW --> CL
-    CI -- consulta nombre y precio --> CA
-    OR -- consulta precios y<br/>descuenta cupos --> CA
+    CI -->|"consulta nombre y precio"| CA
+    OR -->|"consulta precios y descuenta cupos"| CA
 
     ID --- DB1[(nutrivida_identidad)]
     CA --- DB2[(nutrivida_catalogo)]
@@ -275,15 +275,14 @@ Pruebas de las reglas de negocio con **JUnit + Mockito** (sin base de datos ni s
 | ms-identidad | `RunTest`, `UsuarioServiceTest` | 7 |
 | ms-catalogo | `ServicioTest`, `ServicioServiceTest`, `CategoriaServiceTest`, `ServicioControllerSeguridadTest` | 10 |
 | ms-ordenes | `CarritoServiceTest`, `OrdenServiceTest`, `TokenServicioTest` | 10 |
-| ms-catalogo | `ServicioTest`, `ServicioServiceTest`, `CategoriaServiceTest` | 7 |
-| ms-ordenes | `CarritoServiceTest`, `OrdenServiceTest` | 8 |
-| ms-clinico | `ReglasClinicasTest`, `FichaServiceTest` | 9 |
 | ms-citas | `CitaServiceTest` | 15 |
+| ms-clinico | `ReglasClinicasTest`, `FichaServiceTest` | 9 |
 
 **Ejecutar:** en IntelliJ, clic derecho sobre `src/test/java` de cada servicio → **Run 'All Tests'**, o por consola:
 
 ```bash
-mvnw.cmd test
+./mvnw test        # Linux / macOS
+mvnw.cmd test      # Windows
 ```
 
 ---
@@ -296,6 +295,7 @@ NutriVida-Backend/
 ├── ms-identidad/     # Usuarios, login y JWT
 ├── ms-catalogo/      # Categorías y servicios
 ├── ms-ordenes/       # Carrito, pago y órdenes
+├── ms-citas/         # Nutricionistas y agenda de citas
 ├── ms-clinico/       # Fichas clínicas, mediciones y plan alimenticio
 └── README.md
 ```
