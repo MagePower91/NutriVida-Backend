@@ -15,7 +15,8 @@ import org.springframework.web.client.RestClient;
 public class CatalogoClient {
 
     /** Lo que se usa de la respuesta de ms-catalogo en GET /api/v1/servicios/{codigo}. */
-    public record ServicioCatalogo(String codigo, String nombre, String tipo, int precioFinal, boolean activo) { }
+    // `cupos` solo viene en los talleres grupales: varios pacientes a la misma hora, sin nutricionista asignado.
+    public record ServicioCatalogo(String codigo, String nombre, String tipo, int precioFinal, Integer cupos, boolean activo) { }
 
     private final RestClient http;
 
