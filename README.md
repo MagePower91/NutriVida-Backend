@@ -199,7 +199,12 @@ Todas las rutas se consumen a través del gateway: `http://localhost:8080`.
 | POST · DELETE | `/api/v1/nutricionistas[/{id}]` | Administrador | Gestionar nutricionistas |
 | GET | `/api/v1/citas` | Con sesión | Paciente: sus citas · Nutricionista: su agenda · Administrador y Recepción: todas |
 | GET | `/api/v1/citas/{id}` | Su paciente, su nutricionista o el personal | Ver una cita |
-| POST | `/api/v1/citas` | Paciente (para sí), Administrador o Recepción (con `pacienteCorreo`) | Agendar: precio desde ms-catalogo, queda por confirmar y con pago pendiente |
+| GET | `/api/v1/citas/disponibilidad?fecha=&nutricionista=&codigoServicio=` | Con sesión | Bloques del día con `disponible` y motivo (muy próximo, ocupado, sin cupos) |
+| POST | `/api/v1/citas` | Paciente (para sí), Administrador o Recepción (con `pacienteCorreo`) | Agendar con pago en clínica; sin preferencia se asigna un nutricionista libre |
+| PATCH | `/api/v1/citas/{id}/confirmar` | Su paciente o el personal | Confirmar asistencia antes del plazo |
+| PATCH | `/api/v1/citas/{id}/cancelar` | Su paciente (hasta 2 h antes) o el personal | Cancelar; informa el reembolso si estaba pagada online |
+| PATCH | `/api/v1/citas/{id}/reprogramar` | Su paciente (hasta 2 h antes) o el personal | Nueva fecha, hora o nutricionista, conservando el pago |
+| PATCH | `/api/v1/citas/{id}/asistencia` | Su nutricionista, Administrador o Recepción | `ATENDIDA` o `INASISTENCIA` de una cita confirmada |
 | DELETE | `/api/v1/citas/{id}` | Administrador | Eliminar el registro de una cita |
 
 ---
@@ -226,9 +231,12 @@ Todas las rutas se consumen a través del gateway: `http://localhost:8080`.
 - Si ms-catalogo no responde, se informa con un error 503.
 
 **Citas**
-- Solo se agenda dentro de la jornada del nutricionista (días y horario) y sin otra cita activa suya a la misma hora.
-- El paciente siempre agenda a su nombre (el correo sale del token); el precio y el nombre del servicio los define ms-catalogo.
-- Una cita nueva queda **por confirmar** y con **pago pendiente**: el cliente no puede enviar estados ni montos.
+- Solo se agenda dentro de la jornada del nutricionista (días y horario, en bloques de 1 hora) y sin otra cita activa suya a la misma hora. Sin preferencia, se asigna el primer nutricionista libre. Los talleres se controlan por cupos.
+- No se reserva, cancela ni reprograma en línea con menos de **2 h** de anticipación (RN-03, RN-09).
+- Con pago en clínica y 24 h o más de anticipación, la cita queda **por confirmar** hasta 24 h antes; con menos, queda **confirmada** (RN-02, RN-07).
+- Cada 15 minutos una tarea automática **cancela las citas no confirmadas** cuyo plazo venció (RN-06).
+- Reprogramar conserva el pago; una cita pagada sigue confirmada. Cancelar una cita pagada online informa el reembolso del 100 % (RN-11).
+- El paciente siempre agenda a su nombre (el correo sale del token); el precio y el nombre del servicio los define ms-catalogo. El cliente no puede enviar estados ni montos.
 - Cada rol ve solo sus citas: el paciente las suyas, el nutricionista su agenda y el personal todas.
 
 ---
@@ -242,6 +250,7 @@ Pruebas de las reglas de negocio con **JUnit + Mockito** (sin base de datos ni s
 | ms-identidad | `RunTest`, `UsuarioServiceTest` | 7 |
 | ms-catalogo | `ServicioTest`, `ServicioServiceTest`, `CategoriaServiceTest` | 7 |
 | ms-ordenes | `CarritoServiceTest`, `OrdenServiceTest` | 8 |
+| ms-citas | `CitaServiceTest` | 15 |
 
 **Ejecutar:** en IntelliJ, clic derecho sobre `src/test/java` de cada servicio → **Run 'All Tests'**, o por consola:
 
