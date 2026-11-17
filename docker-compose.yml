@@ -1,0 +1,97 @@
+# NutriVida: sistema completo (MySQL + 6 servicios Spring Boot + frontend React con nginx).
+#
+# Uso (ver DESPLIEGUE.md):
+#   1. Clonar NutriVida-Backend y NutriVida-React en la misma carpeta.
+#   2. Crear el archivo .env junto a este archivo (copiar .env.example).
+#   3. docker compose up -d --build
+#
+# Desde Internet solo se accede por el puerto 80 (nginx). El resto de los servicios
+# se comunica dentro de la red interna de Docker usando el nombre de cada contenedor.
+
+x-servicio-java: &servicio-java
+  restart: unless-stopped
+  environment: &entorno-java
+    DB_HOST: mysql
+    DB_USER: root
+    DB_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en el archivo .env}
+    JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en el archivo .env}
+    # Memoria máxima por servicio, para que los 6 quepan en una instancia de 4 GB.
+    JAVA_TOOL_OPTIONS: "-Xms128m -Xmx320m -Duser.timezone=America/Santiago"
+  depends_on:
+    mysql:
+      condition: service_healthy
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en el archivo .env}
+      TZ: America/Santiago
+    volumes:
+      - datos-mysql:/var/lib/mysql   # los datos se conservan aunque se reinicien los contenedores
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  ms-identidad:
+    <<: *servicio-java
+    build: ./ms-identidad
+
+  ms-catalogo:
+    <<: *servicio-java
+    build: ./ms-catalogo
+
+  ms-ordenes:
+    <<: *servicio-java
+    build: ./ms-ordenes
+    environment:
+      <<: *entorno-java
+      CATALOGO_URL: http://ms-catalogo:8082
+
+  ms-citas:
+    <<: *servicio-java
+    build: ./ms-citas
+    environment:
+      <<: *entorno-java
+      CATALOGO_URL: http://ms-catalogo:8082
+
+  ms-clinico:
+    <<: *servicio-java
+    build: ./ms-clinico
+
+  api-gateway:
+    build: ./api-gateway
+    restart: unless-stopped
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en el archivo .env}
+      IDENTIDAD_URL: http://ms-identidad:8081
+      CATALOGO_URL: http://ms-catalogo:8082
+      ORDENES_URL: http://ms-ordenes:8083
+      CITAS_URL: http://ms-citas:8084
+      CLINICO_URL: http://ms-clinico:8085
+      # Orígenes permitidos por CORS. Con nginx el frontend y la API comparten dirección,
+      # pero se puede agregar la IP pública por si se abre el sitio desde otro origen.
+      CORS_ORIGENES: ${CORS_ORIGENES:-http://localhost}
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m -Duser.timezone=America/Santiago"
+    depends_on:
+      - ms-identidad
+      - ms-catalogo
+      - ms-ordenes
+      - ms-citas
+      - ms-clinico
+
+  frontend:
+    # El frontend está en el otro repositorio; se espera clonado al lado de este.
+    build: ${FRONTEND_DIR:-../NutriVida-React}
+    restart: unless-stopped
+    ports:
+      - "80:80"   # único puerto publicado
+    depends_on:
+      - api-gateway
+
+volumes:
+  datos-mysql:

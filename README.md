@@ -321,3 +321,8 @@ src/main/java/cl/nutrivida/<servicio>/
 - Carolina Flores
 - Dennis Fraser
 - Ana Vidal
+
+## Despliegue en AWS (Docker)
+
+El sistema completo (MySQL, los 6 servicios y el frontend con nginx) se levanta con `docker compose up -d --build`.
+La guía paso a paso para una instancia EC2 está en [DESPLIEGUE.md](DESPLIEGUE.md).
