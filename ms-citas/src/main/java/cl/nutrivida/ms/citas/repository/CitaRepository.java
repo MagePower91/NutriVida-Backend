@@ -34,6 +34,9 @@ public interface CitaRepository extends JpaRepository<Cita, Long> {
     // Citas "Por confirmar" cuyo plazo de confirmación ya venció (RN-06)
     List<Cita> findByEstadoCitaAndLimiteConfirmacionBefore(EstadoCita estadoCita, LocalDateTime limite);
 
+    // Sesiones de un plan (RN-13)
+    List<Cita> findByPlanId(String planId);
+
     // Buscar citas según su estado
     List<Cita> findByEstadoCita(EstadoCita estadoCita);
 

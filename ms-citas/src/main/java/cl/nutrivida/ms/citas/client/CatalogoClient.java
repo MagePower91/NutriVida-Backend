@@ -16,7 +16,17 @@ public class CatalogoClient {
 
     /** Lo que se usa de la respuesta de ms-catalogo en GET /api/v1/servicios/{codigo}. */
     // `cupos` solo viene en los talleres grupales: varios pacientes a la misma hora, sin nutricionista asignado.
-    public record ServicioCatalogo(String codigo, String nombre, String tipo, int precioFinal, Integer cupos, boolean activo) { }
+    // `sesiones` solo viene en los planes: cuántas sesiones incluye el pago.
+    public record ServicioCatalogo(String codigo, String nombre, String tipo, int precioFinal, Integer cupos, boolean activo,
+                                   Integer sesiones) {
+        public ServicioCatalogo(String codigo, String nombre, String tipo, int precioFinal, Integer cupos, boolean activo) {
+            this(codigo, nombre, tipo, precioFinal, cupos, activo, null);
+        }
+
+        public boolean esPlan() {
+            return sesiones != null && sesiones > 0;
+        }
+    }
 
     private final RestClient http;
 

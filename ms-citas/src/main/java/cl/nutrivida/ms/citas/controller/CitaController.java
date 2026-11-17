@@ -97,6 +97,23 @@ public class CitaController {
         return ResponseEntity.ok(citaService.registrarAsistencia(id, datos, usuario));
     }
 
+    @Operation(summary = "Registrar pago en clínica",
+            description = "La cita con pago en clínica queda pagada. Administración y recepción.")
+    @PatchMapping("/{id}/pago-clinica")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'RECEPCION')")
+    public ResponseEntity<Cita> registrarPagoEnClinica(@PathVariable Long id) {
+        return ResponseEntity.ok(citaService.registrarPagoEnClinica(id));
+    }
+
+    @Operation(summary = "Registrar reembolso",
+            description = "Devuelve el total de una cita pagada online que terminó cancelada o en inasistencia (RN-11). "
+                    + "Solo administración.")
+    @PatchMapping("/{id}/reembolso")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<Cita> registrarReembolso(@PathVariable Long id) {
+        return ResponseEntity.ok(citaService.registrarReembolso(id));
+    }
+
     @Operation(summary = "Eliminar una cita", description = "Solo administración.")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR')")

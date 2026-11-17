@@ -35,7 +35,7 @@ spring:
             - id: citas
               uri: ${CITAS_URL:http://localhost:8084}
               predicates:
-                - Path=/api/v1/citas/**,/api/v1/nutricionistas/**
+                - Path=/api/v1/citas/**,/api/v1/nutricionistas/**,/api/v1/planes/**
             - id: clinico
               uri: ${CLINICO_URL:http://localhost:8085}
               predicates:

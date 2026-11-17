@@ -19,3 +19,4 @@ app:
     secreto: ${JWT_SECRET}
   servicios:
     catalogo-url: ${CATALOGO_URL:http://localhost:8082}
+    citas-url: ${CITAS_URL:http://localhost:8084}

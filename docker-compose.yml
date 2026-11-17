@@ -51,6 +51,7 @@ services:
     environment:
       <<: *entorno-java
       CATALOGO_URL: http://ms-catalogo:8082
+      CITAS_URL: http://ms-citas:8084
 
   ms-citas:
     <<: *servicio-java
