@@ -18,7 +18,21 @@ public final class OrdenesDtos {
             @NotBlank(message = "El código del servicio es obligatorio.")
             @Pattern(regexp = "^[A-Za-z]{2}[0-9]{3}$", message = "Código de servicio inválido (ej: CN001).")
             String codigoServicio,
-            @Schema(example = "2026-12-15T10:00:00")
+            @Schema(example = "2026-12-15T10:00:00", description = "Obligatoria, salvo en un plan (su primera sesión se puede agendar después)")
+            @Future(message = "La fecha y hora debe ser futura.")
+            LocalDateTime fechaHora,
+            @Schema(example = "Carolina Fuentes M.")
+            @Size(max = 100) String nutricionista,
+            @Schema(example = "Bajar de peso")
+            @Size(max = 1000) String motivo) {
+        public AgregarItemRequest(String codigoServicio, LocalDateTime fechaHora, String nutricionista) {
+            this(codigoServicio, fechaHora, nutricionista, null);
+        }
+    }
+
+    /** Cambiar el horario de una atención que ya está en el carrito. */
+    public record EditarItemRequest(
+            @Schema(example = "2026-12-16T11:00:00")
             @NotNull(message = "La fecha y hora es obligatoria.")
             @Future(message = "La fecha y hora debe ser futura.")
             LocalDateTime fechaHora,
@@ -26,10 +40,10 @@ public final class OrdenesDtos {
             @Size(max = 100) String nutricionista) { }
 
     public record ItemResponse(Long id, String codigoServicio, String nombreServicio, int precio,
-                               LocalDateTime fechaHora, String nutricionista) {
+                               LocalDateTime fechaHora, String nutricionista, String motivo) {
         public static ItemResponse de(ItemCarrito i) {
             return new ItemResponse(i.getId(), i.getCodigoServicio(), i.getNombreServicio(), i.getPrecio(),
-                    i.getFechaHora(), i.getNutricionista());
+                    i.getFechaHora(), i.getNutricionista(), i.getMotivo());
         }
     }
 
@@ -53,20 +67,29 @@ public final class OrdenesDtos {
             @NotBlank(message = "El CVV es obligatorio.")
             @Pattern(regexp = "^[0-9]{3}$", message = "El CVV debe tener 3 dígitos.")
             String cvv,
-            @Schema(description = "IDs de las atenciones a pagar. Vacío = todo el carrito.")
-            List<Long> itemIds) { }
+            @Schema(description = "IDs de las atenciones del carrito a pagar. Sin enviar (null) = todo el carrito; [] = ninguna.")
+            List<Long> itemIds,
+            @Schema(description = "Citas ya agendadas con pago en clínica que se pagan online en esta misma orden.")
+            List<Long> citaIds,
+            @Schema(example = "paciente@gmail.com", description = "Opcional: correo para la confirmación.")
+            @Email(message = "Ingresa un correo de confirmación válido.")
+            String correoConfirmacion) {
+        public CheckoutRequest(String titular, String numero, String vencimiento, String cvv, List<Long> itemIds) {
+            this(titular, numero, vencimiento, cvv, itemIds, null, null);
+        }
+    }
 
     // ---------- Órdenes ----------
 
     public record DetalleResponse(String codigoServicio, String nombreServicio, int precio,
-                                  LocalDateTime fechaHora, String nutricionista) { }
+                                  LocalDateTime fechaHora, String nutricionista, Long citaId, Long planId) { }
 
     public record OrdenResponse(Long id, String runPaciente, String correoPaciente, LocalDateTime fecha,
                                 String estado, int total, String tarjeta, List<DetalleResponse> detalles) {
         public static OrdenResponse de(Orden o) {
             List<DetalleResponse> detalles = o.getDetalles().stream()
                     .map(d -> new DetalleResponse(d.getCodigoServicio(), d.getNombreServicio(), d.getPrecio(),
-                            d.getFechaHora(), d.getNutricionista()))
+                            d.getFechaHora(), d.getNutricionista(), d.getCitaId(), d.getPlanId()))
                     .toList();
             return new OrdenResponse(o.getId(), o.getRunPaciente(), o.getCorreoPaciente(), o.getFecha(),
                     o.getEstado(), o.getTotal(), "**** " + o.getUltimos4Tarjeta(), detalles);

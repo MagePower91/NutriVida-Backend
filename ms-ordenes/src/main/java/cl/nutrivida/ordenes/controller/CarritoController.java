@@ -39,6 +39,14 @@ public class CarritoController {
         return carrito.agregar(jwt.getSubject(), req);
     }
 
+    @Operation(summary = "Cambiar el horario de una atención",
+            description = "Nueva fecha, hora o nutricionista. En un plan agregado sin horario, agenda su primera sesión.")
+    @PutMapping("/items/{id}")
+    public ItemResponse editarHorario(@AuthenticationPrincipal Jwt jwt, @PathVariable("id") Long id,
+                                      @Valid @RequestBody EditarItemRequest req) {
+        return carrito.editarHorario(jwt.getSubject(), id, req);
+    }
+
     @Operation(summary = "Quitar atención")
     @DeleteMapping("/items/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -53,7 +61,7 @@ public class CarritoController {
         carrito.vaciar(jwt.getSubject());
     }
 
-    @Operation(summary = "Pagar (simulado)", description = "Tarjeta terminada en 0000 = rechazada. Genera la orden.")
+    @Operation(summary = "Pagar (simulado)", description = "Tarjeta terminada en 0000 = rechazada. Genera la orden y agenda en ms-citas lo pagado.")
     @PostMapping("/checkout")
     @ResponseStatus(HttpStatus.CREATED)
     public OrdenResponse pagar(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CheckoutRequest req) {

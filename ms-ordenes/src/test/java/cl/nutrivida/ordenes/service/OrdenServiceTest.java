@@ -2,6 +2,10 @@ package cl.nutrivida.ordenes.service;
 
 import cl.nutrivida.ordenes.client.CatalogoClient;
 import cl.nutrivida.ordenes.client.CatalogoClient.ServicioCatalogo;
+import cl.nutrivida.ordenes.client.CitasClient;
+import cl.nutrivida.ordenes.client.CitasClient.LineaPagada;
+import cl.nutrivida.ordenes.client.CitasClient.PagoRequest;
+import cl.nutrivida.ordenes.client.CitasClient.PagoResponse;
 import cl.nutrivida.ordenes.dto.OrdenesDtos.CheckoutRequest;
 import cl.nutrivida.ordenes.dto.OrdenesDtos.OrdenResponse;
 import cl.nutrivida.ordenes.exception.ApiException;
@@ -12,11 +16,13 @@ import cl.nutrivida.ordenes.repository.OrdenRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.oauth2.jwt.Jwt;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -37,6 +43,7 @@ class OrdenServiceTest {
     @Mock OrdenRepository ordenes;
     @Mock ItemCarritoRepository items;
     @Mock CatalogoClient catalogo;
+    @Mock CitasClient citas;
     @InjectMocks OrdenService service;
 
     private Jwt jwtPaciente() {
@@ -82,7 +89,7 @@ class OrdenServiceTest {
         assertThatThrownBy(() -> service.pagar(jwtPaciente(), tarjeta("4111111111111111", "01/24")))
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("vencida");
-        verifyNoInteractions(items, catalogo, ordenes);
+        verifyNoInteractions(items, catalogo, ordenes, citas);
     }
 
     // Verifica que si UNA atención ya no está disponible en el catálogo, no se cobre ninguna.
@@ -109,11 +116,81 @@ class OrdenServiceTest {
         when(catalogo.obtenerServicio("CN001")).thenReturn(servicio("CN001", 30000, true)); // el precio bajó
         when(ordenes.save(any(Orden.class))).thenAnswer(inv -> inv.getArgument(0));
 
+        when(citas.registrarPago(any())).thenReturn(agendado(new LineaPagada(7L, null, "CN001", "Servicio CN001",
+                LocalDateTime.now().plusDays(2), "Carolina Fuentes", BigDecimal.valueOf(30000))));
+
         OrdenResponse r = service.pagar(jwtPaciente(), tarjeta("4111111111111111", "12/30"));
 
         assertThat(r.total()).isEqualTo(30000);
         assertThat(r.estado()).isEqualTo("PAGADA");
         assertThat(r.tarjeta()).isEqualTo("**** 1111");
+        assertThat(r.detalles()).singleElement().satisfies(d -> {
+            assertThat(d.citaId()).isEqualTo(7L);
+            assertThat(d.nutricionista()).isEqualTo("Carolina Fuentes");
+        });
         verify(items).deleteAll(anyList());
+    }
+
+    private static PagoResponse agendado(LineaPagada... lineas) {
+        BigDecimal total = List.of(lineas).stream().map(LineaPagada::precio).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new PagoResponse(List.of(lineas), total);
+    }
+
+    // Verifica que el pago envíe a ms-citas lo que se agenda: las atenciones del carrito y las citas
+    // con pago en clínica elegidas, con el correo del paciente que sale del token.
+    @Test
+    @DisplayName("Al pagar, ms-citas agenda las atenciones y paga las citas pendientes elegidas")
+    void pagoAgendaEnMsCitas() {
+        when(items.findByRunPacienteOrderByFechaHoraAsc(RUN)).thenReturn(List.of(item("CN001", 35000)));
+        when(catalogo.obtenerServicio("CN001")).thenReturn(servicio("CN001", 35000, true));
+        when(ordenes.save(any(Orden.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(citas.registrarPago(any())).thenReturn(agendado(
+                new LineaPagada(7L, null, "CN001", "Servicio CN001", LocalDateTime.now().plusDays(2), "Carolina Fuentes", BigDecimal.valueOf(35000)),
+                new LineaPagada(3L, null, "EV001", "Antropometría", LocalDateTime.now().plusDays(3), "Daniela Morales", BigDecimal.valueOf(18000))));
+
+        OrdenResponse r = service.pagar(jwtPaciente(), new CheckoutRequest("Javiera Soto", "4111111111111111", "12/30", "123",
+                null, List.of(3L), null));
+
+        ArgumentCaptor<PagoRequest> enviado = ArgumentCaptor.forClass(PagoRequest.class);
+        verify(citas).registrarPago(enviado.capture());
+        assertThat(enviado.getValue().pacienteCorreo()).isEqualTo("paciente@gmail.com");
+        assertThat(enviado.getValue().items()).extracting(CitasClient.ItemPagado::codigoServicio).containsExactly("CN001");
+        assertThat(enviado.getValue().citaIds()).containsExactly(3L);
+        assertThat(r.total()).isEqualTo(53000);
+        assertThat(r.detalles()).hasSize(2);
+    }
+
+    // Verifica que si ms-citas no puede agendar una atención (por ejemplo, el horario se ocupó),
+    // no se descuenten cupos ni se vacíe el carrito: no se cobra nada.
+    @Test
+    @DisplayName("Si la agenda rechaza una atención, no se cobra ni se vacía el carrito")
+    void agendaRechazaNoCobra() {
+        when(items.findByRunPacienteOrderByFechaHoraAsc(RUN)).thenReturn(List.of(item("CN001", 35000)));
+        when(catalogo.obtenerServicio("CN001")).thenReturn(servicio("CN001", 35000, true));
+        when(ordenes.save(any(Orden.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(citas.registrarPago(any())).thenThrow(new ApiException(org.springframework.http.HttpStatus.CONFLICT,
+                "No se realizó ningún cobro: «Servicio CN001»: El nutricionista ya tiene una cita en ese horario."));
+
+        assertThatThrownBy(() -> service.pagar(jwtPaciente(), tarjeta("4111111111111111", "12/30")))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("ya tiene una cita");
+        verify(catalogo, never()).reservarCupos(any(), anyInt());
+        verify(items, never()).deleteAll(anyList());
+    }
+
+    // Verifica que se pueda pagar solo una cita con pago en clínica, sin ítems del carrito.
+    @Test
+    @DisplayName("Se puede pagar solo una cita con pago en clínica, sin ítems del carrito")
+    void pagaSoloCitaPendiente() {
+        when(items.findByRunPacienteOrderByFechaHoraAsc(RUN)).thenReturn(List.of(item("CN001", 35000)));
+        when(ordenes.save(any(Orden.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(citas.registrarPago(any())).thenReturn(agendado(new LineaPagada(3L, null, "EV001", "Antropometría",
+                LocalDateTime.now().plusDays(3), "Daniela Morales", BigDecimal.valueOf(18000))));
+
+        OrdenResponse r = service.pagar(jwtPaciente(), new CheckoutRequest("Javiera Soto", "4111111111111111", "12/30", "123",
+                List.of(), List.of(3L), null));
+
+        assertThat(r.total()).isEqualTo(18000);
+        verify(items).deleteAll(List.of());   // el ítem del carrito no se eligió: se queda
     }
 }

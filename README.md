@@ -49,7 +49,7 @@ flowchart LR
 
 **Seguridad en dos capas:** el gateway rechaza las peticiones sin token o con un token inválido o vencido. Cada microservicio vuelve a validar el token y aplica los permisos por rol (`@PreAuthorize`).
 
-**Llamadas entre servicios:** cuando ms-ordenes necesita descontar cupos en ms-catalogo, no reenvía el token del paciente: firma su propio token de servicio (1 minuto, rol `SERVICIO`, que ningún usuario puede tener). Ese endpoint solo acepta ese rol o al administrador, y el gateway lo bloquea desde el navegador.
+**Llamadas entre servicios:** cuando ms-ordenes necesita descontar cupos en ms-catalogo o agendar en ms-citas lo que se pagó, no reenvía el token del paciente: firma su propio token de servicio (1 minuto, rol `SERVICIO`, que ningún usuario puede tener). Ese endpoint solo acepta ese rol o al administrador, y el gateway lo bloquea desde el navegador.
 
 ---
 
@@ -191,10 +191,11 @@ Todas las rutas se consumen a través del gateway: `http://localhost:8080`.
 | Método | Ruta | Acceso | Descripción |
 |---|---|---|---|
 | GET | `/api/v1/carrito` | Paciente | Ver carrito y total |
-| POST | `/api/v1/carrito/items` | Paciente | Agregar atención (servicio + fecha/hora) |
+| POST | `/api/v1/carrito/items` | Paciente | Agregar atención (servicio + fecha/hora; un plan puede ir sin horario) |
+| PUT | `/api/v1/carrito/items/{id}` | Paciente | Cambiar fecha, hora o nutricionista de una atención del carrito |
 | DELETE | `/api/v1/carrito/items/{id}` | Paciente | Quitar atención |
 | DELETE | `/api/v1/carrito` | Paciente | Vaciar carrito |
-| POST | `/api/v1/carrito/checkout` | Paciente | Pagar (simulado) y generar la orden |
+| POST | `/api/v1/carrito/checkout` | Paciente | Pagar (simulado), generar la orden y agendar lo pagado en ms-citas (también paga citas con pago en clínica elegidas) |
 | GET | `/api/v1/ordenes` | Con sesión | Paciente: sus órdenes · Administrador y Recepción: todas |
 | GET | `/api/v1/ordenes/{id}` | Dueño, Administrador o Recepción | Detalle de una orden |
 
@@ -213,7 +214,13 @@ Todas las rutas se consumen a través del gateway: `http://localhost:8080`.
 | PATCH | `/api/v1/citas/{id}/cancelar` | Su paciente (hasta 2 h antes) o el personal | Cancelar; informa el reembolso si estaba pagada online |
 | PATCH | `/api/v1/citas/{id}/reprogramar` | Su paciente (hasta 2 h antes) o el personal | Nueva fecha, hora o nutricionista, conservando el pago |
 | PATCH | `/api/v1/citas/{id}/asistencia` | Su nutricionista, Administrador o Recepción | `ATENDIDA` o `INASISTENCIA` de una cita confirmada |
+| PATCH | `/api/v1/citas/{id}/pago-clinica` | Administrador o Recepción | Registrar el pago en clínica de una cita |
+| PATCH | `/api/v1/citas/{id}/reembolso` | Administrador | Registrar la devolución de una cita pagada online y cancelada o con inasistencia |
 | DELETE | `/api/v1/citas/{id}` | Administrador | Eliminar el registro de una cita |
+| POST | `/api/v1/citas/pagos` | Solo ms-ordenes (token de servicio) | Interno: crea las citas pagadas, contrata planes y paga citas pendientes. El gateway lo bloquea. |
+| GET | `/api/v1/planes` | Paciente (los suyos), Administrador o Recepción | Planes contratados con sesiones atendidas, agendadas y por agendar |
+| GET | `/api/v1/planes/{id}` | Su paciente o el personal | Ver un plan |
+| POST | `/api/v1/planes/{id}/sesiones` | Su paciente o el personal | Agendar otra sesión del plan sin volver a pagar |
 
 ### ms-clinico
 
@@ -247,6 +254,8 @@ Todas las rutas se consumen a través del gateway: `http://localhost:8080`.
 - Máximo 10 atenciones en el carrito y sin dos atenciones a la misma hora; fecha siempre futura.
 - **El precio lo define ms-catalogo**, nunca el navegador.
 - Al pagar se vuelve a verificar todo en el catálogo: si una atención ya no está disponible, **no se cobra nada**.
+- **El pago agenda:** al pagar, ms-ordenes le pide a ms-citas (con su token de servicio) que cree las citas confirmadas y pagadas, contrate los planes y marque como pagadas las citas con pago en clínica elegidas. Si una atención ya no se puede agendar (horario ocupado, menos de 2 h), no se cobra nada y el mensaje dice cuál cambiar.
+- Un plan se puede pagar sin agendar su primera sesión; sus sesiones (precio 0) se agendan después en `/api/v1/planes/{id}/sesiones` mientras quede saldo.
 - Tarjeta validada (16 dígitos, MM/AA no vencido, CVV de 3 dígitos); solo se guardan los últimos 4 dígitos.
 - Si ms-catalogo no responde, se informa con un error 503.
 
