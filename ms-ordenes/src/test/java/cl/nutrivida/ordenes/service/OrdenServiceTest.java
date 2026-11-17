@@ -161,7 +161,7 @@ class OrdenServiceTest {
     }
 
     // Verifica que si ms-citas no puede agendar una atención (por ejemplo, el horario se ocupó),
-    // no se descuenten cupos ni se vacíe el carrito: no se cobra nada.
+    // no se vacíe el carrito: no se cobra nada.
     @Test
     @DisplayName("Si la agenda rechaza una atención, no se cobra ni se vacía el carrito")
     void agendaRechazaNoCobra() {
@@ -174,7 +174,6 @@ class OrdenServiceTest {
         assertThatThrownBy(() -> service.pagar(jwtPaciente(), tarjeta("4111111111111111", "12/30")))
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("ya tiene una cita");
-        verify(catalogo, never()).reservarCupos(any(), anyInt());
         verify(items, never()).deleteAll(anyList());
     }
 
@@ -192,5 +191,46 @@ class OrdenServiceTest {
 
         assertThat(r.total()).isEqualTo(18000);
         verify(items).deleteAll(List.of());   // el ítem del carrito no se eligió: se queda
+    }
+
+    private ServicioCatalogo taller(String codigo, int cupos) {
+        return new ServicioCatalogo(codigo, "Taller " + codigo, 4L, "Taller grupal", "90 min", "Presencial (grupo)",
+                "Nutricionista", 15000, 0, 15000, null, cupos, "desc", true);
+    }
+
+    // Verifica que los cupos del catálogo se traten como capacidad POR HORARIO: pagar un taller no consulta
+    // ni descuenta un "total" de cupos; quien decide si el horario tiene lugar es ms-citas al agendar.
+    @Test
+    @DisplayName("Pagar un taller no descuenta cupos del catálogo: el cupo por horario lo controla ms-citas")
+    void tallerNoDescuentaCuposDelCatalogo() {
+        when(items.findByRunPacienteOrderByFechaHoraAsc(RUN)).thenReturn(List.of(item("TG001", 15000), item("TG001", 15000)));
+        when(catalogo.obtenerServicio("TG001")).thenReturn(taller("TG001", 1)); // 1 cupo por horario
+        when(ordenes.save(any(Orden.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(citas.registrarPago(any())).thenReturn(agendado(
+                new LineaPagada(1L, null, "TG001", "Taller TG001", LocalDateTime.now().plusDays(2), null, BigDecimal.valueOf(15000)),
+                new LineaPagada(2L, null, "TG001", "Taller TG001", LocalDateTime.now().plusDays(9), null, BigDecimal.valueOf(15000))));
+
+        // Dos sesiones del mismo taller en días distintos: cada horario tiene su propio cupo.
+        OrdenResponse r = service.pagar(jwtPaciente(), tarjeta("4111111111111111", "12/30"));
+
+        assertThat(r.total()).isEqualTo(30000);
+        verify(catalogo, times(1)).obtenerServicio("TG001");
+        verifyNoMoreInteractions(catalogo);
+    }
+
+    // Verifica que si el horario del taller ya está lleno, el rechazo de ms-citas evita el cobro.
+    @Test
+    @DisplayName("Si el horario del taller está lleno, ms-citas lo rechaza y no se cobra")
+    void tallerLlenoNoCobra() {
+        when(items.findByRunPacienteOrderByFechaHoraAsc(RUN)).thenReturn(List.of(item("TG001", 15000)));
+        when(catalogo.obtenerServicio("TG001")).thenReturn(taller("TG001", 10));
+        when(ordenes.save(any(Orden.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(citas.registrarPago(any())).thenThrow(new ApiException(org.springframework.http.HttpStatus.CONFLICT,
+                "No se realizó ningún cobro: «Taller TG001»: El taller ya no tiene cupos en ese horario."));
+
+        assertThatThrownBy(() -> service.pagar(jwtPaciente(), tarjeta("4111111111111111", "12/30")))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("no tiene cupos en ese horario");
+        verify(items, never()).deleteAll(anyList());
     }
 }

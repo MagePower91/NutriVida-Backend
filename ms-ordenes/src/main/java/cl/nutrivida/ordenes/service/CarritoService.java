@@ -52,9 +52,7 @@ public class CarritoService {
         if (!s.activo()) {
             throw new ApiException(HttpStatus.CONFLICT, "El servicio «" + s.nombre() + "» no está disponible.");
         }
-        if (s.cupos() != null && s.cupos() <= 0) {
-            throw new ApiException(HttpStatus.CONFLICT, "El taller «" + s.nombre() + "» no tiene cupos disponibles.");
-        }
+        // Los cupos de un taller son por horario: si el horario elegido está lleno, lo rechaza ms-citas al pagar.
         // Solo un plan se puede pagar sin horario: su primera sesión se agenda después (RN-13).
         boolean esPlan = s.sesiones() != null && s.sesiones() > 0;
         if (fechaHora == null && !esPlan) {
