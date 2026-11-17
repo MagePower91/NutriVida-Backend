@@ -29,7 +29,7 @@ flowchart LR
     GW --> CI
     GW --> CL
     CI -->|"consulta nombre y precio"| CA
-    OR -->|"consulta precios y descuenta cupos"| CA
+    OR -->|"consulta precios y disponibilidad"| CA
 
     ID --- DB1[(nutrivida_identidad)]
     CA --- DB2[(nutrivida_catalogo)]
@@ -49,7 +49,7 @@ flowchart LR
 
 **Seguridad en dos capas:** el gateway rechaza las peticiones sin token o con un token inválido o vencido. Cada microservicio vuelve a validar el token y aplica los permisos por rol (`@PreAuthorize`).
 
-**Llamadas entre servicios:** cuando ms-ordenes necesita descontar cupos en ms-catalogo o agendar en ms-citas lo que se pagó, no reenvía el token del paciente: firma su propio token de servicio (1 minuto, rol `SERVICIO`, que ningún usuario puede tener). Ese endpoint solo acepta ese rol o al administrador, y el gateway lo bloquea desde el navegador.
+**Llamadas entre servicios:** cuando ms-ordenes necesita agendar en ms-citas lo que se pagó, no reenvía el token del paciente: firma su propio token de servicio (1 minuto, rol `SERVICIO`, que ningún usuario puede tener). Ese endpoint solo acepta ese rol o al administrador, y el gateway lo bloquea desde el navegador.
 
 ---
 
@@ -184,7 +184,7 @@ Todas las rutas se consumen a través del gateway: `http://localhost:8080`.
 | GET | `/api/v1/servicios?categoriaId=&soloActivos=` | Público | Lista servicios con precio final |
 | GET | `/api/v1/servicios/{codigo}` | Público | Ver un servicio |
 | POST · PUT · DELETE | `/api/v1/servicios[/{codigo}]` | Administrador | Gestionar servicios |
-| PATCH | `/api/v1/servicios/{codigo}/cupos` | Interno: ms-ordenes (rol `SERVICIO`) o Administrador | Descuenta cupos de un taller. El gateway lo bloquea desde afuera |
+| PATCH | `/api/v1/servicios/{codigo}/cupos` | Rol `SERVICIO` o Administrador | Descuenta cupos de un taller. El gateway lo bloquea desde afuera. Ya no se usa al pagar: el cupo es por horario y lo controla ms-citas |
 
 ### ms-ordenes
 
@@ -246,7 +246,7 @@ Todas las rutas se consumen a través del gateway: `http://localhost:8080`.
 
 **Catálogo**
 - Código de servicio con formato `AA000`, único. Precio mayor a 0 y descuento entre 0 y 100 %.
-- Los talleres grupales requieren cupos y los planes requieren número de sesiones.
+- Los talleres grupales requieren cupos (**capacidad de cada horario** del taller) y los planes requieren número de sesiones.
 - No se puede eliminar una categoría con servicios asociados.
 - La reserva de cupos bloquea la fila (bloqueo pesimista) para evitar sobreventa.
 
@@ -260,7 +260,7 @@ Todas las rutas se consumen a través del gateway: `http://localhost:8080`.
 - Si ms-catalogo no responde, se informa con un error 503.
 
 **Citas**
-- Solo se agenda dentro de la jornada del nutricionista (días y horario, en bloques de 1 hora) y sin otra cita activa suya a la misma hora. Sin preferencia, se asigna el primer nutricionista libre. Los talleres se controlan por cupos.
+- Solo se agenda dentro de la jornada del nutricionista (días y horario, en bloques de 1 hora) y sin otra cita activa suya a la misma hora. Sin preferencia, se asigna el primer nutricionista libre. Los talleres se controlan por cupos: en cada horario caben tantas personas como cupos tenga el taller en el catálogo, y al pagar ms-citas rechaza el horario que ya está lleno (no se cobra).
 - No se reserva, cancela ni reprograma en línea con menos de **2 h** de anticipación (RN-03, RN-09).
 - Con pago en clínica y 24 h o más de anticipación, la cita queda **por confirmar** hasta 24 h antes; con menos, queda **confirmada** (RN-02, RN-07).
 - Cada 15 minutos una tarea automática **cancela las citas no confirmadas** cuyo plazo venció (RN-06).
