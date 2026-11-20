@@ -1,5 +1,5 @@
-#//Qué hace cada parte://
-#//routes: si la ruta coincide con Path, la petición se reenvía a la uri indicada.//
+﻿#//QuÃ© hace cada parte://
+#//routes: si la ruta coincide con Path, la peticiÃ³n se reenvÃ­a a la uri indicada.//
 #//StripPrefix=1: quita la primera parte de la ruta. Por ejemplo, /identidad/v3/api-docs llega a ms-identidad como /v3/api-docs.//
 #//secreto: debe ser exactamente igual al de los otros dos servicios.//
 #//Cada uri usa localhost por defecto (desarrollo). En Docker/AWS se cambia con IDENTIDAD_URL, CATALOGO_URL, ORDENES_URL, CITAS_URL y CLINICO_URL.//
@@ -40,7 +40,7 @@ spring:
               uri: ${CLINICO_URL:http://localhost:8085}
               predicates:
                 - Path=/api/v1/fichas/**
-            # ---------- Documentación Swagger de cada servicio ----------
+            # ---------- DocumentaciÃ³n Swagger de cada servicio ----------
             - id: identidad-docs
               uri: ${IDENTIDAD_URL:http://localhost:8081}
               predicates:
@@ -91,3 +91,4 @@ springdoc:
         url: /citas/v3/api-docs
       - name: ms-clinico
         url: /clinico/v3/api-docs
+

@@ -1,12 +1,13 @@
+
 # NutriVida: sistema completo (MySQL + 6 servicios Spring Boot + frontend React con nginx).
 #
-# Uso (ver DESPLIEGUE.md):
+# Uso:
 #   1. Clonar NutriVida-Backend y NutriVida-React en la misma carpeta.
-#   2. Crear el archivo .env junto a este archivo (copiar .env.example).
+#   2. Crear .env junto a este archivo (copiar .env.example).
 #   3. docker compose up -d --build
 #
-# Desde Internet solo se accede por el puerto 80 (nginx). El resto de los servicios
-# se comunica dentro de la red interna de Docker usando el nombre de cada contenedor.
+# Desde Internet solo se accede por el puerto 80 (nginx).
+# Los servicios se comunican mediante la red interna de Docker.
 
 x-servicio-java: &servicio-java
   restart: unless-stopped
@@ -15,7 +16,6 @@ x-servicio-java: &servicio-java
     DB_USER: root
     DB_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en el archivo .env}
     JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en el archivo .env}
-    # Memoria máxima por servicio, para que los 6 quepan en una instancia de 4 GB.
     JAVA_TOOL_OPTIONS: "-Xms128m -Xmx320m -Duser.timezone=America/Santiago"
   depends_on:
     mysql:
@@ -29,7 +29,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en el archivo .env}
       TZ: America/Santiago
     volumes:
-      - datos-mysql:/var/lib/mysql   # los datos se conservan aunque se reinicien los contenedores
+      - datos-mysql:/var/lib/mysql
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 10s
@@ -74,8 +74,6 @@ services:
       ORDENES_URL: http://ms-ordenes:8083
       CITAS_URL: http://ms-citas:8084
       CLINICO_URL: http://ms-clinico:8085
-      # Orígenes permitidos por CORS. Con nginx el frontend y la API comparten dirección,
-      # pero se puede agregar la IP pública por si se abre el sitio desde otro origen.
       CORS_ORIGENES: ${CORS_ORIGENES:-http://localhost}
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m -Duser.timezone=America/Santiago"
     depends_on:
@@ -86,11 +84,11 @@ services:
       - ms-clinico
 
   frontend:
-    # El frontend está en el otro repositorio; se espera clonado al lado de este.
+    # Frontend ubicado en el repositorio NutriVida-React.
     build: ${FRONTEND_DIR:-../NutriVida-React}
     restart: unless-stopped
     ports:
-      - "80:80"   # único puerto publicado
+      - "80:80"
     depends_on:
       - api-gateway
 
