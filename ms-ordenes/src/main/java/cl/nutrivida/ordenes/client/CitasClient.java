@@ -1,6 +1,3 @@
-// Comunicación entre microservicios: al confirmar el pago, ms-ordenes le pide a ms-citas que agende lo pagado
-// (citas confirmadas, planes contratados y citas con pago en clínica que se pagan online).
-// Usa el token de servicio de ms-ordenes (rol SERVICIO), no el del paciente.
 
 package cl.nutrivida.ordenes.client;
 
@@ -11,9 +8,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -21,28 +18,76 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Comunicación entre ms-ordenes y ms-citas.
+ * Permite registrar pagos completos y registrar planes ya pagados.
+ */
 @Component
 public class CitasClient {
 
-    /** Una atención pagada: un plan puede ir sin fecha (sin primera sesión). */
-    public record ItemPagado(String codigoServicio, LocalDateTime fechaHora, String nutricionista, String motivo) { }
+    /** Una atención pagada. La referencia identifica de forma única cada plan. */
+    public record ItemPagado(
+            String codigoServicio,
+            LocalDateTime fechaHora,
+            String nutricionista,
+            String motivo,
+            String referenciaCompra
+    ) {
+        // Compatibilidad con llamadas que todavía usan cuatro parámetros.
+        public ItemPagado(
+                String codigoServicio,
+                LocalDateTime fechaHora,
+                String nutricionista,
+                String motivo
+        ) {
+            this(codigoServicio, fechaHora, nutricionista, motivo, null);
+        }
+    }
 
-    public record PagoRequest(String ordenId, String pacienteCorreo, String correoConfirmacion,
-                              List<ItemPagado> items, List<Long> citaIds) { }
+    public record PagoRequest(
+            String ordenId,
+            String pacienteCorreo,
+            String correoConfirmacion,
+            List<ItemPagado> items,
+            List<Long> citaIds
+    ) { }
 
-    public record LineaPagada(Long citaId, Long planId, String codigoServicio, String nombreServicio,
-                              LocalDateTime fechaHora, String nutricionista, BigDecimal precio) { }
+    public record LineaPagada(
+            Long citaId,
+            Long planId,
+            String codigoServicio,
+            String nombreServicio,
+            LocalDateTime fechaHora,
+            String nutricionista,
+            BigDecimal precio
+    ) { }
 
     public record PagoResponse(List<LineaPagada> lineas, BigDecimal total) { }
+
+    /** Datos para registrar un plan que ya fue pagado. */
+    public record RegistrarPlanRequest(
+            String referenciaCompra,
+            String ordenId,
+            String pacienteCorreo,
+            String codigoServicio,
+            String nombreServicio,
+            Integer sesionesTotales
+    ) { }
 
     private final RestClient http;
     private final TokenServicio tokenServicio;
 
-    public CitasClient(@Value("${app.servicios.citas-url}") String citasUrl, TokenServicio tokenServicio) {
+    public CitasClient(
+            @Value("${app.servicios.citas-url}") String citasUrl,
+            TokenServicio tokenServicio
+    ) {
         this.tokenServicio = tokenServicio;
-        this.http = RestClient.builder().baseUrl(citasUrl).build();
+        this.http = RestClient.builder()
+                .baseUrl(citasUrl)
+                .build();
     }
 
+    /** Envía el pago completo a ms-citas. */
     public PagoResponse registrarPago(PagoRequest pago) {
         try {
             return http.post()
@@ -52,20 +97,53 @@ public class CitasClient {
                     .body(pago)
                     .retrieve()
                     .body(PagoResponse.class);
-        } catch (HttpClientErrorException e) {
-            // ms-citas explica qué atención ya no se puede agendar (horario ocupado, menos de 2 h, etc.).
-            throw new ApiException(HttpStatus.CONFLICT, "No se realizó ningún cobro: " + mensajeDe(e));
+
+        } catch (RestClientResponseException e) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "No se realizó ningún cobro: " + mensajeDe(e)
+            );
+
         } catch (ResourceAccessException e) {
-            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "La agenda no está disponible en este momento. No se realizó ningún cobro.");
+            throw new ApiException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "La agenda no está disponible en este momento. No se realizó ningún cobro."
+            );
         }
     }
 
-    // Las respuestas de error de la API son {"status": ..., "mensaje": "..."}: se toma el mensaje.
-    private static final Pattern MENSAJE = Pattern.compile("\"mensaje\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
+    /** Registra en ms-citas un plan que ya fue pagado. */
+    public void registrarPlan(RegistrarPlanRequest datos) {
+        try {
+            http.post()
+                    .uri("/api/v1/planes")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenServicio.emitir())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(datos)
+                    .retrieve()
+                    .toBodilessEntity();
 
-    private static String mensajeDe(HttpClientErrorException e) {
+        } catch (RestClientResponseException e) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "No se pudo registrar el plan en el servicio de citas."
+            );
+
+        } catch (ResourceAccessException e) {
+            throw new ApiException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "El servicio de citas no está disponible en este momento."
+            );
+        }
+    }
+
+    private static final Pattern MENSAJE =
+            Pattern.compile("\"mensaje\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
+
+    private static String mensajeDe(RestClientResponseException e) {
         Matcher encontrado = MENSAJE.matcher(e.getResponseBodyAsString());
-        return encontrado.find() ? encontrado.group(1) : "una de las atenciones ya no se puede agendar.";
+        return encontrado.find()
+                ? encontrado.group(1)
+                : "una de las atenciones ya no se puede agendar.";
     }
 }

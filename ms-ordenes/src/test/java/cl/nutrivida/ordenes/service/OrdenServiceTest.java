@@ -11,6 +11,8 @@ import cl.nutrivida.ordenes.dto.OrdenesDtos.OrdenResponse;
 import cl.nutrivida.ordenes.exception.ApiException;
 import cl.nutrivida.ordenes.model.ItemCarrito;
 import cl.nutrivida.ordenes.model.Orden;
+import cl.nutrivida.ordenes.model.DetalleOrden;
+import cl.nutrivida.ordenes.repository.DetalleOrdenRepository;
 import cl.nutrivida.ordenes.repository.ItemCarritoRepository;
 import cl.nutrivida.ordenes.repository.OrdenRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -44,6 +46,7 @@ class OrdenServiceTest {
     @Mock ItemCarritoRepository items;
     @Mock CatalogoClient catalogo;
     @Mock CitasClient citas;
+    @Mock DetalleOrdenRepository detallesOrden;
     @InjectMocks OrdenService service;
 
     private Jwt jwtPaciente() {
@@ -232,5 +235,75 @@ class OrdenServiceTest {
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("no tiene cupos en ese horario");
         verify(items, never()).deleteAll(anyList());
+    }
+
+    @Test
+    @DisplayName("Reintento exitoso: registra el plan y cambia su estado")
+    void reintentoPlanExitoso() {
+        Orden orden = new Orden();
+        orden.setId(100L);
+        orden.setCorreoPaciente("paciente@gmail.com");
+
+        DetalleOrden detalle = new DetalleOrden(
+                "PL001", "Plan PL001", 120000, null, null
+        );
+
+        detalle.setId(5L);
+        detalle.setOrden(orden);
+        detalle.setEstadoRegistroPlan("PENDIENTE");
+        detalle.setSesionesTotales(5);
+
+        when(detallesOrden.findByEstadoRegistroPlanAndOrden_Estado(
+                "PENDIENTE", "PAGADA"
+        )).thenReturn(List.of(detalle));
+
+        int registrados = service.reintentarRegistroPlanesPendientes();
+
+        assertThat(registrados).isEqualTo(1);
+        assertThat(detalle.getEstadoRegistroPlan()).isEqualTo("REGISTRADO");
+        assertThat(detalle.getReferenciaCompra()).isEqualTo("100-5");
+
+        verify(citas).registrarPlan(
+                new CitasClient.RegistrarPlanRequest(
+                        "100-5", "100", "paciente@gmail.com",
+                        "PL001", "Plan PL001", 5
+                )
+        );
+
+        verify(detallesOrden).save(detalle);
+    }
+
+    @Test
+    @DisplayName("Reintento fallido: conserva el plan pendiente")
+    void reintentoPlanFalla() {
+        Orden orden = new Orden();
+        orden.setId(100L);
+        orden.setCorreoPaciente("paciente@gmail.com");
+
+        DetalleOrden detalle = new DetalleOrden(
+                "PL001", "Plan PL001", 120000, null, null
+        );
+
+        detalle.setId(5L);
+        detalle.setOrden(orden);
+        detalle.setEstadoRegistroPlan("PENDIENTE");
+        detalle.setSesionesTotales(5);
+
+        when(detallesOrden.findByEstadoRegistroPlanAndOrden_Estado(
+                "PENDIENTE", "PAGADA"
+        )).thenReturn(List.of(detalle));
+
+        doThrow(new RuntimeException("Servicio no disponible"))
+                .when(citas)
+                .registrarPlan(any(CitasClient.RegistrarPlanRequest.class));
+
+        int registrados = service.reintentarRegistroPlanesPendientes();
+
+        assertThat(registrados).isZero();
+        assertThat(detalle.getEstadoRegistroPlan()).isEqualTo("PENDIENTE");
+        assertThat(detalle.getReferenciaCompra()).isEqualTo("100-5");
+
+        verify(citas).registrarPlan(any(CitasClient.RegistrarPlanRequest.class));
+        verify(detallesOrden).save(detalle);
     }
 }

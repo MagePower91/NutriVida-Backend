@@ -72,7 +72,7 @@ class PagoYPlanesTest {
         Clock reloj = Clock.fixed(AHORA.atZone(CHILE).toInstant(), CHILE);
         citaService = new CitaService(citas, nutricionistas, catalogo, reloj);
         pagoService = new PagoService(citas, planes, catalogo, citaService, reloj);
-        planService = new PlanService(planes, citas, pagoService);
+        planService = new PlanService(planes, citas, pagoService, catalogo, reloj);
 
         Nutricionista carolina = new Nutricionista();
         carolina.setId("NUT001");

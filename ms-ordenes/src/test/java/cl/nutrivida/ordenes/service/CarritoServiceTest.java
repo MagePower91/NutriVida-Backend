@@ -60,6 +60,8 @@ class CarritoServiceTest {
     @DisplayName("No permite dos atenciones a la misma hora")
     void choqueDeHorario() {
         when(items.countByRunPaciente(RUN)).thenReturn(1L);
+        when(catalogo.obtenerServicio("CN001"))
+        .thenReturn(servicio("CN001", 35000, true));
         when(items.existsByRunPacienteAndFechaHora(RUN, manana)).thenReturn(true);
 
         assertThatThrownBy(() -> service.agregar(RUN, new AgregarItemRequest("CN001", manana, null)))
@@ -87,7 +89,6 @@ class CarritoServiceTest {
     @DisplayName("No permite agregar un servicio desactivado")
     void servicioInactivo() {
         when(items.countByRunPaciente(RUN)).thenReturn(0L);
-        when(items.existsByRunPacienteAndFechaHora(RUN, manana)).thenReturn(false);
         when(catalogo.obtenerServicio("CN001")).thenReturn(servicio("CN001", 35000, false));
 
         assertThatThrownBy(() -> service.agregar(RUN, new AgregarItemRequest("CN001", manana, null)))

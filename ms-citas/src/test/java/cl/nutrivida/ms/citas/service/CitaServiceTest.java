@@ -67,7 +67,9 @@ class CitaServiceTest {
         daniela = nutricionista("NUT003", "Daniela Morales", "daniela.morales@nutrivida.cl", "08:00", "13:00", List.of(1, 2, 3, 4, 5));
         when(nutricionistas.findAll()).thenReturn(List.of(carolina, daniela));
         when(catalogo.obtenerServicio("CN001"))
-                .thenReturn(new ServicioCatalogo("CN001", "Primera consulta nutricional", "Consulta", 35000, null, true));
+               .thenReturn(new ServicioCatalogo(
+        "CN001", "Primera consulta nutricional", "Consulta", 35000, null,true, null
+        ));
         when(citas.save(any(Cita.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
     }
 
@@ -162,19 +164,25 @@ class CitaServiceTest {
         verify(citas, never()).save(any());
     }
 
-    @Test
-    void unTallerSeLlenaPorCupos() {
+       @Test
+        void unTallerSeLlenaPorCupos() {
         when(catalogo.obtenerServicio("TG001"))
-                .thenReturn(new ServicioCatalogo("TG001", "Taller de cocina saludable", "Taller grupal", 15000, 1, true));
+                .thenReturn(new ServicioCatalogo(
+                        "TG001", "Taller de cocina saludable",
+                        "Taller grupal", 15000, 1,true, null
+                ));
+
         Cita inscrita = cita(9L, "otro@gmail.com", null, MIERCOLES_10, EstadoCita.CONFIRMADA);
         inscrita.setCodigoServicio("TG001");
-        when(citas.findByFechaHoraAndEstadoCitaIn(any(), any())).thenReturn(List.of(inscrita));
 
-        assertThatThrownBy(() -> servicio.crearCita(new CitaRequest("TG001", null, MIERCOLES_10, null, null, null), PACIENTE))
+        when(citas.findByFechaHoraAndEstadoCitaIn(any(), any()))
+                .thenReturn(List.of(inscrita));
+
+        assertThatThrownBy(() -> servicio.crearCita(
+                new CitaRequest("TG001", null, MIERCOLES_10, null, null, null), PACIENTE))
                 .isInstanceOf(HorarioOcupadoException.class)
                 .hasMessageContaining("cupos");
     }
-
     @Test
     void unNutricionistaNoPuedeAgendarCitas() {
         CitaRequest datos = new CitaRequest("CN001", null, MIERCOLES_10, null, null, null);
@@ -220,8 +228,9 @@ class CitaServiceTest {
         Cita vencida = cita(8L, "paciente@gmail.com", "Carolina Fuentes", AHORA.plusHours(20), EstadoCita.POR_CONFIRMAR);
         vencida.setLimiteConfirmacion(AHORA.minusHours(4));
         when(citas.findById(8L)).thenReturn(Optional.of(vencida));
-        assertThatThrownBy(() -> servicio.confirmar(8L, PACIENTE)).hasMessageContaining("venció");
-        assertThat(vencida.getEstadoCita()).isEqualTo(EstadoCita.CANCELADA); // RN-06
+        assertThat(servicio.confirmar(8L, PACIENTE).getEstadoCita())
+            .isEqualTo(EstadoCita.CANCELADA); // RN-06
+        verify(citas).save(vencida);
     }
 
     @Test

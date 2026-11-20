@@ -97,29 +97,104 @@ public class PagoService {
         return linea(guardada, null, precio);
     }
 
-    // RN-13: el plan se paga completo una vez. La primera sesión es opcional.
-    private LineaPagada contratarPlan(ServicioCatalogo servicio, ItemPagado item, String paciente,
-                                      String correoConfirmacion, String ordenId) {
-        BigDecimal precio = BigDecimal.valueOf(servicio.precioFinal());
-        Plan plan = new Plan();
-        plan.setPacienteCorreo(paciente);
-        plan.setCodigoServicio(servicio.codigo());
-        plan.setNombre(servicio.nombre());
-        plan.setSesionesTotales(servicio.sesiones());
-        plan.setMontoPagado(precio);
-        plan.setEstadoPlan(EstadoPlan.ACTIVO);
-        plan.setOrdenId(ordenId);
-        plan.setMotivo(item.motivo());
-        plan.setCreadoEn(ahora());
-        Plan guardado = planRepository.save(plan);
+   
+// RN-13: el plan se paga completo una vez. La primera sesión es opcional.
+private LineaPagada contratarPlan(ServicioCatalogo servicio, ItemPagado item, String paciente,
+                                  String correoConfirmacion, String ordenId) {
 
-        if (item.fechaHora() == null) {
-            return new LineaPagada(null, guardado.getId(), servicio.codigo(), servicio.nombre(), null, null, precio);
-        }
-        Cita sesion = crearSesion(guardado, correoConfirmacion, item.fechaHora(), item.nutricionista());
-        return new LineaPagada(sesion.getId(), guardado.getId(), servicio.codigo(), servicio.nombre(),
-                sesion.getFechaHora(), sesion.getNutricionista(), precio);
+    if (textoVacio(item.referenciaCompra())) {
+        throw new ApiException(
+                HttpStatus.BAD_REQUEST,
+                "Falta la referencia de compra del plan «" + servicio.nombre() + "»."
+        );
     }
+
+    // Si ya existe un plan con esta referencia, no lo volvemos a crear.
+    Plan existente = planRepository.findByReferenciaCompra(item.referenciaCompra()).orElse(null);
+
+    if (existente != null) {
+        if (!existente.getPacienteCorreo().equalsIgnoreCase(paciente)
+                || !existente.getCodigoServicio().equals(servicio.codigo())) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "La referencia de compra ya está asociada a otro plan."
+            );
+        }
+
+        // Recuperamos la primera sesión existente, si el plan tenía una.
+        List<Cita> sesiones = citaRepository.findByPlanId(String.valueOf(existente.getId()));
+
+        if (!sesiones.isEmpty()) {
+            Cita sesion = sesiones.get(0);
+            return new LineaPagada(
+                    sesion.getId(),
+                    existente.getId(),
+                    servicio.codigo(),
+                    existente.getNombre(),
+                    sesion.getFechaHora(),
+                    sesion.getNutricionista(),
+                    existente.getMontoPagado()
+            );
+        }
+
+        return new LineaPagada(
+                null,
+                existente.getId(),
+                servicio.codigo(),
+                existente.getNombre(),
+                null,
+                null,
+                existente.getMontoPagado()
+        );
+    }
+
+    // Si no existe, registramos el plan por primera vez.
+    BigDecimal precio = BigDecimal.valueOf(servicio.precioFinal());
+
+    Plan plan = new Plan();
+    plan.setReferenciaCompra(item.referenciaCompra());
+    plan.setPacienteCorreo(paciente);
+    plan.setCodigoServicio(servicio.codigo());
+    plan.setNombre(servicio.nombre());
+    plan.setSesionesTotales(servicio.sesiones());
+    plan.setMontoPagado(precio);
+    plan.setEstadoPlan(EstadoPlan.ACTIVO);
+    plan.setOrdenId(ordenId);
+    plan.setMotivo(item.motivo());
+    plan.setCreadoEn(ahora());
+
+    Plan guardado = planRepository.save(plan);
+
+    if (item.fechaHora() == null) {
+        return new LineaPagada(
+                null,
+                guardado.getId(),
+                servicio.codigo(),
+                servicio.nombre(),
+                null,
+                null,
+                precio
+        );
+    }
+
+    Cita sesion = crearSesion(
+            guardado,
+            correoConfirmacion,
+            item.fechaHora(),
+            item.nutricionista()
+    );
+
+    return new LineaPagada(
+            sesion.getId(),
+            guardado.getId(),
+            servicio.codigo(),
+            servicio.nombre(),
+            sesion.getFechaHora(),
+            sesion.getNutricionista(),
+            precio
+    );
+}
+
 
     // Sesión de un plan: confirmada y sin precio propio (el pago está en el plan).
     Cita crearSesion(Plan plan, String correoConfirmacion, LocalDateTime fechaHora, String nutricionista) {

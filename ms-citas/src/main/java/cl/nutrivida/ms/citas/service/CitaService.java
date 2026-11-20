@@ -22,6 +22,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import cl.nutrivida.ms.citas.dto.AgendarSesionRequest;
+import cl.nutrivida.ms.citas.model.Plan;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -160,6 +162,43 @@ public class CitaService {
         return citaRepository.save(cita);
     }
 
+    // RN-13: agenda una sesión utilizando un plan previamente comprado.
+    @Transactional
+    public Cita agendarSesionPlan(Plan plan, AgendarSesionRequest datos) {
+
+        ServicioCatalogo servicio =
+                catalogoClient.obtenerServicio(plan.getCodigoServicio());
+
+        Evaluacion evaluacion = ReglasCita.evaluarReserva(
+                datos.fechaHora(),
+                MetodoPago.ONLINE,
+                ahora()
+        );
+
+        Cita cita = new Cita();
+        cita.setPacienteCorreo(plan.getPacienteCorreo());
+        cita.setCorreoConfirmacion(plan.getPacienteCorreo());
+        cita.setCodigoServicio(plan.getCodigoServicio());
+        cita.setNombreServicio(plan.getNombreServicio());
+        cita.setOrdenId(plan.getOrdenId());
+        cita.setPlanId(String.valueOf(plan.getId()));
+        cita.setFechaHora(datos.fechaHora());
+        cita.setMetodoPago(MetodoPago.ONLINE);
+        cita.setEstadoCita(evaluacion.estadoCita());
+        cita.setLimiteConfirmacion(evaluacion.limiteConfirmacion());
+        cita.setEstadoPago(EstadoPago.PAGADO);
+        cita.setPrecio(BigDecimal.ZERO);
+        cita.setMontoPagado(BigDecimal.ZERO);
+        cita.setMontoReembolsado(BigDecimal.ZERO);
+        cita.setCreadaEn(ahora());
+        cita.setReprogramaciones(0);
+
+        asignarHorario(cita, datos.nutricionista(), servicio.cupos());
+
+        return citaRepository.save(cita);
+    }
+
+
     // ---------- Acciones sobre una cita ----------
 
     // RN-05: el paciente confirma su asistencia. Si el plazo ya venció, la cita se cancela (RN-06).
@@ -173,7 +212,7 @@ public class CitaService {
         if (ReglasCita.debeCancelarsePorFaltaDeConfirmacion(cita, ahora())) {
             cita.setEstadoCita(EstadoCita.CANCELADA);
             citaRepository.save(cita);
-            throw new ApiException(HttpStatus.CONFLICT, "El plazo para confirmar venció y la cita fue cancelada.");
+            return cita;
         }
         cita.setEstadoCita(EstadoCita.CONFIRMADA);
         cita.setLimiteConfirmacion(null);

@@ -46,5 +46,7 @@ public interface CitaRepository extends JpaRepository<Cita, Long> {
     List<EstadoCita> estados
 );
 
+    
+
 
 }
