@@ -1,0 +1,104 @@
+﻿services:
+  ms-identidad:
+    build:
+      context: ./ms-identidad
+    env_file:
+      - ./nutrivida.env
+    environment:
+      DB_HOST: 172.28.0.1
+      DB_PORT: "3306"
+      JAVA_TOOL_OPTIONS: "-Xms32m -Xmx128m -XX:MaxMetaspaceSize=160m -Xss512k"
+    restart: unless-stopped
+    networks:
+      - nutrivida-net
+
+  ms-catalogo:
+    build:
+      context: ./ms-catalogo
+    env_file:
+      - ./nutrivida.env
+    environment:
+      DB_HOST: 172.28.0.1
+      DB_PORT: "3306"
+      JAVA_TOOL_OPTIONS: "-Xms32m -Xmx128m -XX:MaxMetaspaceSize=160m -Xss512k"
+    restart: unless-stopped
+    networks:
+      - nutrivida-net
+
+  ms-ordenes:
+    build:
+      context: ./ms-ordenes
+    env_file:
+      - ./nutrivida.env
+    environment:
+      DB_HOST: 172.28.0.1
+      DB_PORT: "3306"
+      CATALOGO_URL: http://ms-catalogo:8082
+      JAVA_TOOL_OPTIONS: "-Xms32m -Xmx128m -XX:MaxMetaspaceSize=160m -Xss512k"
+    restart: unless-stopped
+    networks:
+      - nutrivida-net
+    depends_on:
+      - ms-catalogo
+
+  ms-citas:
+    build:
+      context: ./ms-citas
+    env_file:
+      - ./nutrivida.env
+    environment:
+      DB_HOST: 172.28.0.1
+      DB_PORT: "3306"
+      CATALOGO_URL: http://ms-catalogo:8082
+      JAVA_TOOL_OPTIONS: "-Xms32m -Xmx128m -XX:MaxMetaspaceSize=160m -Xss512k"
+    restart: unless-stopped
+    networks:
+      - nutrivida-net
+    depends_on:
+      - ms-catalogo
+
+  ms-clinico:
+    build:
+      context: ./ms-clinico
+    env_file:
+      - ./nutrivida.env
+    environment:
+      DB_HOST: 172.28.0.1
+      DB_PORT: "3306"
+      JAVA_TOOL_OPTIONS: "-Xms32m -Xmx128m -XX:MaxMetaspaceSize=160m -Xss512k"
+    restart: unless-stopped
+    networks:
+      - nutrivida-net
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+    env_file:
+      - ./nutrivida.env
+    environment:
+      IDENTIDAD_URL: http://ms-identidad:8081
+      CATALOGO_URL: http://ms-catalogo:8082
+      ORDENES_URL: http://ms-ordenes:8083
+      CITAS_URL: http://ms-citas:8084
+      CLINICO_URL: http://ms-clinico:8085
+      JAVA_TOOL_OPTIONS: "-Xms32m -Xmx128m -XX:MaxMetaspaceSize=160m -Xss512k"
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+    networks:
+      - nutrivida-net
+    depends_on:
+      - ms-identidad
+      - ms-catalogo
+      - ms-ordenes
+      - ms-citas
+      - ms-clinico
+
+networks:
+  nutrivida-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+          gateway: 172.28.0.1
+
