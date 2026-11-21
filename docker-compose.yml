@@ -1,92 +1,81 @@
-﻿services:
-  ms-identidad:
-    build:
-      context: ./ms-identidad
-    env_file:
-      - ./nutrivida.env
-    environment:
-      DB_HOST: 172.28.0.1
-      DB_PORT: "3306"
-      JAVA_TOOL_OPTIONS: "-Xms32m -Xmx128m -XX:MaxMetaspaceSize=160m -Xss512k"
+
+# NutriVida: sistema completo (MySQL + 6 servicios Spring Boot + frontend React con nginx).
+#
+# Uso:
+#   1. Clonar NutriVida-Backend y NutriVida-React en la misma carpeta.
+#   2. Crear .env junto a este archivo (copiar .env.example).
+#   3. docker compose up -d --build
+#
+# Desde Internet solo se accede por el puerto 80 (nginx).
+# Los servicios se comunican mediante la red interna de Docker.
+
+x-servicio-java: &servicio-java
+  restart: unless-stopped
+  environment: &entorno-java
+    DB_HOST: mysql
+    DB_USER: root
+    DB_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en el archivo .env}
+    JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en el archivo .env}
+    JAVA_TOOL_OPTIONS: "-Xms128m -Xmx320m -Duser.timezone=America/Santiago"
+  depends_on:
+    mysql:
+      condition: service_healthy
+
+services:
+  mysql:
+    image: mysql:8.4
     restart: unless-stopped
-    networks:
-      - nutrivida-net
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en el archivo .env}
+      TZ: America/Santiago
+    volumes:
+      - datos-mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  ms-identidad:
+    <<: *servicio-java
+    build: ./ms-identidad
 
   ms-catalogo:
-    build:
-      context: ./ms-catalogo
-    env_file:
-      - ./nutrivida.env
-    environment:
-      DB_HOST: 172.28.0.1
-      DB_PORT: "3306"
-      JAVA_TOOL_OPTIONS: "-Xms32m -Xmx128m -XX:MaxMetaspaceSize=160m -Xss512k"
-    restart: unless-stopped
-    networks:
-      - nutrivida-net
+    <<: *servicio-java
+    build: ./ms-catalogo
 
   ms-ordenes:
-    build:
-      context: ./ms-ordenes
-    env_file:
-      - ./nutrivida.env
+    <<: *servicio-java
+    build: ./ms-ordenes
     environment:
-      DB_HOST: 172.28.0.1
-      DB_PORT: "3306"
+      <<: *entorno-java
       CATALOGO_URL: http://ms-catalogo:8082
-      JAVA_TOOL_OPTIONS: "-Xms32m -Xmx128m -XX:MaxMetaspaceSize=160m -Xss512k"
-    restart: unless-stopped
-    networks:
-      - nutrivida-net
-    depends_on:
-      - ms-catalogo
+      CITAS_URL: http://ms-citas:8084
 
   ms-citas:
-    build:
-      context: ./ms-citas
-    env_file:
-      - ./nutrivida.env
+    <<: *servicio-java
+    build: ./ms-citas
     environment:
-      DB_HOST: 172.28.0.1
-      DB_PORT: "3306"
+      <<: *entorno-java
       CATALOGO_URL: http://ms-catalogo:8082
-      JAVA_TOOL_OPTIONS: "-Xms32m -Xmx128m -XX:MaxMetaspaceSize=160m -Xss512k"
-    restart: unless-stopped
-    networks:
-      - nutrivida-net
-    depends_on:
-      - ms-catalogo
 
   ms-clinico:
-    build:
-      context: ./ms-clinico
-    env_file:
-      - ./nutrivida.env
-    environment:
-      DB_HOST: 172.28.0.1
-      DB_PORT: "3306"
-      JAVA_TOOL_OPTIONS: "-Xms32m -Xmx128m -XX:MaxMetaspaceSize=160m -Xss512k"
-    restart: unless-stopped
-    networks:
-      - nutrivida-net
+    <<: *servicio-java
+    build: ./ms-clinico
 
   api-gateway:
-    build:
-      context: ./api-gateway
-    env_file:
-      - ./nutrivida.env
+    build: ./api-gateway
+    restart: unless-stopped
     environment:
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en el archivo .env}
       IDENTIDAD_URL: http://ms-identidad:8081
       CATALOGO_URL: http://ms-catalogo:8082
       ORDENES_URL: http://ms-ordenes:8083
       CITAS_URL: http://ms-citas:8084
       CLINICO_URL: http://ms-clinico:8085
-      JAVA_TOOL_OPTIONS: "-Xms32m -Xmx128m -XX:MaxMetaspaceSize=160m -Xss512k"
-    ports:
-      - "127.0.0.1:8080:8080"
-    restart: unless-stopped
-    networks:
-      - nutrivida-net
+      CORS_ORIGENES: ${CORS_ORIGENES:-http://localhost}
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m -Duser.timezone=America/Santiago"
     depends_on:
       - ms-identidad
       - ms-catalogo
@@ -94,11 +83,14 @@
       - ms-citas
       - ms-clinico
 
-networks:
-  nutrivida-net:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.28.0.0/16
-          gateway: 172.28.0.1
+  frontend:
+    # Frontend ubicado en el repositorio NutriVida-React.
+    build: ${FRONTEND_DIR:-../NutriVida-React}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - api-gateway
 
+volumes:
+  datos-mysql:

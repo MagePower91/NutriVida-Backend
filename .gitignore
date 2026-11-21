@@ -1,34 +1,39 @@
-# Compiled class file
+
+# Archivos compilados de Java
 *.class
-
-# Log file
-*.log
-
-# BlueJ files
-*.ctxt
-
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-
-# Package Files #
 *.jar
 *.war
 *.nar
 *.ear
+
+# Archivos comprimidos
 *.zip
 *.tar.gz
 *.rar
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+# Logs y errores
+*.log
 hs_err_pid*
 replay_pid*
 
+# Archivos temporales
+*.ctxt
+.mtj.tmp/
+
 # Variables de entorno y credenciales
-nutrivida.env
-*.env
 .env
 .env.*
 !.env.example
+*.env
+nutrivida.env
+
+# Configuraciones locales de Spring Boot
+**/application-local.yaml
+**/application-local.yml
+
+# Archivos compilados de Maven
+**/target/
 
 # Archivos locales de IDE
 .idea/
+.vscode/

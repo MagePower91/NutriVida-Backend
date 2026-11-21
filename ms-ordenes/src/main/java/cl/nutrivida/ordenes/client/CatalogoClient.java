@@ -3,19 +3,14 @@
 package cl.nutrivida.ordenes.client;
 
 import cl.nutrivida.ordenes.exception.ApiException;
-import cl.nutrivida.ordenes.security.TokenServicio;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
-import java.util.Map;
 
-/** Comunicación entre microservicios: ms-ordenes consulta y actualiza ms-catalogo por HTTP. */
+/** Comunicación entre microservicios: ms-ordenes consulta en ms-catalogo el precio y la disponibilidad de un servicio. */
 @Component
 public class CatalogoClient {
 
@@ -27,14 +22,9 @@ public class CatalogoClient {
             Integer sesiones, Integer cupos, String descripcion, boolean activo) { }
 
     private final RestClient http;
-    private final TokenServicio tokenServicio;
 
-    public CatalogoClient(@Value("${app.servicios.catalogo-url}") String catalogoUrl, TokenServicio tokenServicio) {
-        this.tokenServicio = tokenServicio;
-        this.http = RestClient.builder()
-                .baseUrl(catalogoUrl)
-                .requestFactory(new JdkClientHttpRequestFactory())   // soporta PATCH
-                .build();
+    public CatalogoClient(@Value("${app.servicios.catalogo-url}") String catalogoUrl) {
+        this.http = RestClient.builder().baseUrl(catalogoUrl).build();
     }
 
     public ServicioCatalogo obtenerServicio(String codigo) {
@@ -45,24 +35,6 @@ public class CatalogoClient {
                     .body(ServicioCatalogo.class);
         } catch (HttpClientErrorException.NotFound e) {
             throw new ApiException(HttpStatus.NOT_FOUND, "El servicio " + codigo + " no existe en el catálogo.");
-        } catch (ResourceAccessException e) {
-            throw catalogoNoDisponible();
-        }
-    }
-
-    /** Descuenta cupos de un taller. Usa el token de servicio de ms-ordenes (rol SERVICIO), no el del paciente. */
-    public void reservarCupos(String codigo, int cantidad) {
-        try {
-            http.patch()
-                    .uri("/api/v1/servicios/{codigo}/cupos", codigo)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenServicio.emitir())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("cantidad", cantidad))
-                    .retrieve()
-                    .toBodilessEntity();
-        } catch (HttpClientErrorException e) {
-            throw new ApiException(HttpStatus.CONFLICT,
-                    "No se pudo reservar cupo en " + codigo + ": no quedan cupos suficientes.");
         } catch (ResourceAccessException e) {
             throw catalogoNoDisponible();
         }

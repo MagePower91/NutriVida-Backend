@@ -256,6 +256,36 @@ public class CitaService {
         return citaRepository.save(cita);
     }
 
+    // RN-02: la recepción registra el pago de una cita con pago en clínica (efectivo o tarjeta en el mesón).
+    // Se puede antes o después de la atención, mientras no esté cancelada.
+    @Transactional
+    public Cita registrarPagoEnClinica(Long id) {
+        Cita cita = obtener(id);
+        if (cita.getMetodoPago() != MetodoPago.CLINICA || cita.getEstadoPago() != EstadoPago.PENDIENTE) {
+            throw new ApiException(HttpStatus.CONFLICT, "Esta cita no tiene un pago en clínica pendiente.");
+        }
+        if (cita.getEstadoCita() == EstadoCita.CANCELADA) {
+            throw new ApiException(HttpStatus.CONFLICT, "No se registra el pago de una cita cancelada.");
+        }
+        cita.setEstadoPago(EstadoPago.PAGADO);
+        cita.setMontoPagado(cita.getPrecio());
+        return citaRepository.save(cita);
+    }
+
+    // RN-11: el administrador registra la devolución completa de una cita pagada online que terminó
+    // cancelada o en inasistencia.
+    @Transactional
+    public Cita registrarReembolso(Long id) {
+        Cita cita = obtener(id);
+        BigDecimal pendiente = ReglasCita.reembolsoPendiente(cita);
+        if (pendiente.signum() <= 0) {
+            throw new ApiException(HttpStatus.CONFLICT, "Esta cita no tiene un reembolso pendiente.");
+        }
+        cita.setMontoReembolsado(pendiente);
+        cita.setEstadoPago(EstadoPago.REEMBOLSADO_TOTAL);
+        return citaRepository.save(cita);
+    }
+
     // Solo administración (se valida en el controlador). Cancelar es otra operación: esto borra el registro.
     @Transactional
     public void eliminarCita(Long id) {
@@ -278,7 +308,7 @@ public class CitaService {
 
     // Deja la cita con su nutricionista (el preferido o el primero libre) y verifica que el horario sirva.
     // Los talleres (con cupos) no llevan nutricionista: se controla que no se pase de los cupos.
-    private void asignarHorario(Cita cita, String preferido, Integer cupos) {
+    void asignarHorario(Cita cita, String preferido, Integer cupos) {
         List<Cita> aEsaHora = citaRepository.findByFechaHoraAndEstadoCitaIn(cita.getFechaHora(), ReglasCita.ESTADOS_ACTIVOS)
                 .stream().filter(otra -> !Objects.equals(otra.getId(), cita.getId())).toList();
 

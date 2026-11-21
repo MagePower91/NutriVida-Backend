@@ -34,6 +34,8 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.OPTIONS).permitAll()
                         // Descontar cupos es una llamada interna entre microservicios: nunca desde el navegador.
                         .pathMatchers(HttpMethod.PATCH, "/api/v1/servicios/*/cupos").denyAll()
+                        // Registrar un pago en la agenda también es interno (lo llama ms-ordenes al cobrar).
+                        .pathMatchers("/api/v1/citas/pagos", "/api/v1/citas/pagos/**").denyAll()
                         .pathMatchers("/api/v1/auth/login", "/api/v1/auth/registro",
                                 "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/v1/servicios/**", "/api/v1/categorias/**").permitAll()

@@ -24,11 +24,14 @@ public class DetalleOrden {
     @Column(nullable = false)
     private int precio;                    // precio cobrado (copia, por si el catálogo cambia después)
 
-    @Column(nullable = false)
-    private LocalDateTime fechaHora;
+    private LocalDateTime fechaHora;       // null en un plan pagado sin su primera sesión
 
     @Column(length = 100)
     private String nutricionista;
+
+    private Long citaId;                   // cita creada en ms-citas (o la que se pagó)
+
+    private Long planId;                   // plan contratado en ms-citas
 
     public DetalleOrden() { }
 
@@ -39,6 +42,22 @@ public class DetalleOrden {
         this.precio = precio;
         this.fechaHora = fechaHora;
         this.nutricionista = nutricionista;
+    }
+
+    public Long getCitaId() {
+        return citaId;
+    }
+
+    public void setCitaId(Long citaId) {
+        this.citaId = citaId;
+    }
+
+    public Long getPlanId() {
+        return planId;
+    }
+
+    public void setPlanId(Long planId) {
+        this.planId = planId;
     }
 
     public Long getId() {

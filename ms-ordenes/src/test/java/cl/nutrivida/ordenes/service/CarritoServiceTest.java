@@ -3,6 +3,7 @@ package cl.nutrivida.ordenes.service;
 import cl.nutrivida.ordenes.client.CatalogoClient;
 import cl.nutrivida.ordenes.client.CatalogoClient.ServicioCatalogo;
 import cl.nutrivida.ordenes.dto.OrdenesDtos.AgregarItemRequest;
+import cl.nutrivida.ordenes.dto.OrdenesDtos.EditarItemRequest;
 import cl.nutrivida.ordenes.dto.OrdenesDtos.ItemResponse;
 import cl.nutrivida.ordenes.exception.ApiException;
 import cl.nutrivida.ordenes.model.ItemCarrito;
@@ -15,6 +16,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -91,5 +94,71 @@ class CarritoServiceTest {
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("no está disponible");
         verify(items, never()).save(any());
+    }
+
+    private ServicioCatalogo plan(String codigo, int sesiones) {
+        return new ServicioCatalogo(codigo, "Plan " + codigo, 2L, "Plan especializado", "—", "Presencial",
+                "Nutricionista", 65000, 0, 65000, sesiones, null, "desc", true);
+    }
+
+    // Verifica que un plan se pueda agregar sin horario: su primera sesión se agenda después (RN-13).
+    @Test
+    @DisplayName("Un plan se puede agregar sin horario")
+    void planSinHorario() {
+        when(items.countByRunPaciente(RUN)).thenReturn(0L);
+        when(catalogo.obtenerServicio("PL001")).thenReturn(plan("PL001", 2));
+        when(items.save(any(ItemCarrito.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ItemResponse r = service.agregar(RUN, new AgregarItemRequest("PL001", null, "Carolina Fuentes", "Bajar de peso"));
+
+        assertThat(r.fechaHora()).isNull();
+        assertThat(r.nutricionista()).isNull();
+        assertThat(r.motivo()).isEqualTo("Bajar de peso");
+    }
+
+    // Verifica que una consulta (que no es plan) exija fecha y hora.
+    @Test
+    @DisplayName("Una consulta sin horario se rechaza")
+    void consultaSinHorario() {
+        when(items.countByRunPaciente(RUN)).thenReturn(0L);
+        when(catalogo.obtenerServicio("CN001")).thenReturn(servicio("CN001", 35000, true));
+
+        assertThatThrownBy(() -> service.agregar(RUN, new AgregarItemRequest("CN001", null, null)))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("Elige una fecha");
+        verify(items, never()).save(any());
+    }
+
+    // Verifica que al editar el horario no choque con otra atención del carrito a la misma hora.
+    @Test
+    @DisplayName("Editar el horario no permite chocar con otra atención del carrito")
+    void editarHorarioChoque() {
+        ItemCarrito editado = new ItemCarrito(RUN, "CN001", "Consulta", 35000, manana, null);
+        editado.setId(1L);
+        ItemCarrito otro = new ItemCarrito(RUN, "EV001", "Evaluación", 18000, manana.plusHours(1), null);
+        otro.setId(2L);
+        when(items.findByIdAndRunPaciente(1L, RUN)).thenReturn(Optional.of(editado));
+        when(items.findByRunPacienteOrderByFechaHoraAsc(RUN)).thenReturn(List.of(editado, otro));
+
+        assertThatThrownBy(() -> service.editarHorario(RUN, 1L, new EditarItemRequest(manana.plusHours(1), null)))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("misma hora");
+        verify(items, never()).save(any());
+    }
+
+    // Verifica que editar el horario guarde la nueva fecha y el nutricionista elegido.
+    @Test
+    @DisplayName("Editar el horario guarda la nueva fecha y nutricionista")
+    void editarHorario() {
+        ItemCarrito editado = new ItemCarrito(RUN, "CN001", "Consulta", 35000, manana, null);
+        editado.setId(1L);
+        when(items.findByIdAndRunPaciente(1L, RUN)).thenReturn(Optional.of(editado));
+        when(items.findByRunPacienteOrderByFechaHoraAsc(RUN)).thenReturn(List.of(editado));
+        when(items.save(any(ItemCarrito.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ItemResponse r = service.editarHorario(RUN, 1L, new EditarItemRequest(manana.plusDays(1), "Carolina Fuentes"));
+
+        assertThat(r.fechaHora()).isEqualTo(manana.plusDays(1));
+        assertThat(r.nutricionista()).isEqualTo("Carolina Fuentes");
     }
 }

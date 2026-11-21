@@ -23,11 +23,13 @@ public class ItemCarrito {
     @Column(nullable = false)
     private int precio;                    // precio final al momento de agregarlo (referencial)
 
-    @Column(nullable = false)
-    private LocalDateTime fechaHora;
+    private LocalDateTime fechaHora;       // null en un plan que se paga sin agendar su primera sesión
 
     @Column(length = 100)
     private String nutricionista;
+
+    @Column(length = 1000)
+    private String motivo;
 
     @Column(nullable = false)
     private LocalDateTime agregadoEn;
@@ -99,6 +101,14 @@ public class ItemCarrito {
 
     public void setNutricionista(String nutricionista) {
         this.nutricionista = nutricionista;
+    }
+
+    public String getMotivo() {
+        return motivo;
+    }
+
+    public void setMotivo(String motivo) {
+        this.motivo = motivo;
     }
 
     public LocalDateTime getAgregadoEn() {

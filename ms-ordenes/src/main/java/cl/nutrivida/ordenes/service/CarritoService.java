@@ -4,6 +4,7 @@ import cl.nutrivida.ordenes.client.CatalogoClient;
 import cl.nutrivida.ordenes.client.CatalogoClient.ServicioCatalogo;
 import cl.nutrivida.ordenes.dto.OrdenesDtos.AgregarItemRequest;
 import cl.nutrivida.ordenes.dto.OrdenesDtos.CarritoResponse;
+import cl.nutrivida.ordenes.dto.OrdenesDtos.EditarItemRequest;
 import cl.nutrivida.ordenes.dto.OrdenesDtos.ItemResponse;
 import cl.nutrivida.ordenes.exception.ApiException;
 import cl.nutrivida.ordenes.model.ItemCarrito;
@@ -41,8 +42,8 @@ public class CarritoService {
             throw new ApiException(HttpStatus.CONFLICT,
                     "El carrito admite como máximo " + MAXIMO_ITEMS + " atenciones.");
         }
-        LocalDateTime fechaHora = req.fechaHora().withSecond(0).withNano(0);
-        if (items.existsByRunPacienteAndFechaHora(run, fechaHora)) {
+        LocalDateTime fechaHora = req.fechaHora() == null ? null : req.fechaHora().withSecond(0).withNano(0);
+        if (fechaHora != null && items.existsByRunPacienteAndFechaHora(run, fechaHora)) {
             throw new ApiException(HttpStatus.CONFLICT, "Ya tienes en el carrito otra atención a esa misma hora.");
         }
 
@@ -51,12 +52,40 @@ public class CarritoService {
         if (!s.activo()) {
             throw new ApiException(HttpStatus.CONFLICT, "El servicio «" + s.nombre() + "» no está disponible.");
         }
-        if (s.cupos() != null && s.cupos() <= 0) {
-            throw new ApiException(HttpStatus.CONFLICT, "El taller «" + s.nombre() + "» no tiene cupos disponibles.");
+        // Los cupos de un taller son por horario: si el horario elegido está lleno, lo rechaza ms-citas al pagar.
+        // Solo un plan se puede pagar sin horario: su primera sesión se agenda después (RN-13).
+        boolean esPlan = s.sesiones() != null && s.sesiones() > 0;
+        if (fechaHora == null && !esPlan) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Elige una fecha y un horario para «" + s.nombre() + "».");
         }
 
-        ItemCarrito nuevo = new ItemCarrito(run, s.codigo(), s.nombre(), s.precioFinal(), fechaHora, req.nutricionista());
+        ItemCarrito nuevo = new ItemCarrito(run, s.codigo(), s.nombre(), s.precioFinal(), fechaHora,
+                fechaHora == null ? null : req.nutricionista());
+        nuevo.setMotivo(req.motivo() == null ? null : req.motivo().trim());
         return ItemResponse.de(items.save(nuevo));
+    }
+
+    // Cambia la fecha, hora o nutricionista de una atención del carrito (también agenda la primera
+    // sesión de un plan que se agregó sin horario). La disponibilidad real se revisa al pagar en ms-citas.
+    @Transactional
+    public ItemResponse editarHorario(String run, Long id, EditarItemRequest req) {
+        ItemCarrito item = items.findByIdAndRunPaciente(id, run)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Esa atención no está en tu carrito."));
+        LocalDateTime fechaHora = req.fechaHora().withSecond(0).withNano(0);
+        String nutricionista = req.nutricionista() == null ? null : req.nutricionista().trim();
+        boolean mismoHorario = fechaHora.equals(item.getFechaHora())
+                && String.valueOf(nutricionista).equalsIgnoreCase(String.valueOf(item.getNutricionista()));
+        if (mismoHorario) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Elige una fecha, hora o nutricionista distinto al actual.");
+        }
+        boolean otraALaMismaHora = items.findByRunPacienteOrderByFechaHoraAsc(run).stream()
+                .anyMatch(otro -> !otro.getId().equals(id) && fechaHora.equals(otro.getFechaHora()));
+        if (otraALaMismaHora) {
+            throw new ApiException(HttpStatus.CONFLICT, "Ya tienes en el carrito otra atención a esa misma hora.");
+        }
+        item.setFechaHora(fechaHora);
+        item.setNutricionista(nutricionista);
+        return ItemResponse.de(items.save(item));
     }
 
     @Transactional
