@@ -7,6 +7,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.http.ResponseEntity;
 import java.util.List;
 
 @RestController
@@ -30,5 +32,20 @@ public class OrdenController {
     @GetMapping("/{id}")
     public OrdenResponse obtener(@PathVariable("id") Long id, @AuthenticationPrincipal Jwt jwt) {
         return service.obtener(id, jwt);
+    }
+
+    @Operation(
+        summary = "Reintentar registro de planes pendientes",
+        description = "Disponible para Administrador y Recepción."
+    )
+    @PostMapping("/reintentar-planes")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'RECEPCION')")
+    public ResponseEntity<String> reintentarPlanesPendientes() {
+
+        int registrados = service.reintentarRegistroPlanesPendientes();
+
+        return ResponseEntity.ok(
+                "Planes registrados correctamente: " + registrados
+        );
     }
 }

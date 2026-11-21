@@ -72,7 +72,7 @@ class PagoYPlanesTest {
         Clock reloj = Clock.fixed(AHORA.atZone(CHILE).toInstant(), CHILE);
         citaService = new CitaService(citas, nutricionistas, catalogo, reloj);
         pagoService = new PagoService(citas, planes, catalogo, citaService, reloj);
-        planService = new PlanService(planes, citas, pagoService);
+        planService = new PlanService(planes, citas, pagoService, catalogo, reloj);
 
         Nutricionista carolina = new Nutricionista();
         carolina.setId("NUT001");
@@ -178,7 +178,7 @@ class PagoYPlanesTest {
     @Test
     @DisplayName("Un plan sin horario se contrata sin crear sesiones")
     void planSinHorarioSoloSeContrata() {
-        PagoResponse respuesta = pagoService.registrarPagoOnline(pago(List.of(new ItemPagado("PL001", null, null, null)), null));
+        PagoResponse respuesta = pagoService.registrarPagoOnline(pago(List.of(new ItemPagado("PL001", null, null, null, "C-1")), null));
 
         LineaPagada linea = respuesta.lineas().get(0);
         assertThat(linea.planId()).isEqualTo(9L);
@@ -192,7 +192,7 @@ class PagoYPlanesTest {
     @DisplayName("Un plan con horario crea su primera sesión, sin precio propio")
     void planConHorarioCreaPrimeraSesion() {
         PagoResponse respuesta = pagoService.registrarPagoOnline(
-                pago(List.of(new ItemPagado("PL001", MIERCOLES_10, "Carolina Fuentes", null)), null));
+                pago(List.of(new ItemPagado("PL001", MIERCOLES_10, "Carolina Fuentes", null, "C-2")), null));
 
         assertThat(respuesta.lineas().get(0).citaId()).isEqualTo(100L);
         assertThat(respuesta.total()).isEqualByComparingTo("65000");   // se cobra el plan, no la sesión

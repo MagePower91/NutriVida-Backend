@@ -17,6 +17,7 @@ import cl.nutrivida.ordenes.model.ItemCarrito;
 import cl.nutrivida.ordenes.model.Orden;
 import cl.nutrivida.ordenes.repository.ItemCarritoRepository;
 import cl.nutrivida.ordenes.repository.OrdenRepository;
+import cl.nutrivida.ordenes.repository.DetalleOrdenRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
@@ -33,13 +34,21 @@ public class OrdenService {
     private final OrdenRepository ordenes;
     private final ItemCarritoRepository items;
     private final CatalogoClient catalogo;
-    private final CitasClient citas;
+    private final CitasClient citasClient;
+    private final DetalleOrdenRepository detallesOrden;
 
-    public OrdenService(OrdenRepository ordenes, ItemCarritoRepository items, CatalogoClient catalogo, CitasClient citas) {
+    public OrdenService(
+            OrdenRepository ordenes,
+            ItemCarritoRepository items,
+            CatalogoClient catalogo,
+            CitasClient citasClient,
+            DetalleOrdenRepository detallesOrden
+    ) {
         this.ordenes = ordenes;
         this.items = items;
         this.catalogo = catalogo;
-        this.citas = citas;
+        this.citasClient = citasClient;
+        this.detallesOrden = detallesOrden;
     }
 
     @Transactional
@@ -92,26 +101,65 @@ public class OrdenService {
         ordenes.save(orden);
 
         List<ItemPagado> pagados = aPagar.stream()
-                .map(i -> new ItemPagado(i.getCodigoServicio(), i.getFechaHora(), i.getNutricionista(), i.getMotivo()))
+                .map(i -> {
+                    ServicioCatalogo servicio = servicios.get(i.getCodigoServicio());
+                    // La referencia se mantiene estable mientras el artículo siga en el carrito.
+                    String referenciaCompra = servicio.esPlan() ? "C-" + i.getId() : null;
+                    return new ItemPagado(i.getCodigoServicio(), i.getFechaHora(), i.getNutricionista(),
+                            i.getMotivo(), referenciaCompra);
+                })
                 .toList();
-        PagoResponse agenda = citas.registrarPago(new PagoRequest(String.valueOf(orden.getId()),
-                jwt.getClaimAsString("correo"), req.correoConfirmacion(), pagados, citaIds));
 
-        // 6. El detalle (boleta) con lo que efectivamente se agendó y su precio actual
+        PagoResponse agenda = citasClient.registrarPago(new PagoRequest(
+                String.valueOf(orden.getId()),
+                jwt.getClaimAsString("correo"),
+                req.correoConfirmacion(),
+                pagados,
+                citaIds
+        ));
+
+        // 6. Crear los detalles de la boleta con lo que efectivamente registró ms-citas.
         int total = 0;
+        int indiceItem = 0;
+
         for (LineaPagada linea : agenda.lineas()) {
+
             int precio = linea.precio() == null ? 0 : linea.precio().intValue();
-            DetalleOrden detalle = new DetalleOrden(linea.codigoServicio(), linea.nombreServicio(), precio,
-                    linea.fechaHora(), linea.nutricionista());
+
+            DetalleOrden detalle = new DetalleOrden(
+                    linea.codigoServicio(),
+                    linea.nombreServicio(),
+                    precio,
+                    linea.fechaHora(),
+                    linea.nutricionista()
+            );
+
             detalle.setCitaId(linea.citaId());
             detalle.setPlanId(linea.planId());
+
+            // Las primeras líneas corresponden a los artículos del carrito.
+            // Las siguientes pueden corresponder a citas que se pagaron en clínica.
+            if (indiceItem < aPagar.size()) {
+                ItemCarrito item = aPagar.get(indiceItem);
+                ServicioCatalogo servicio = servicios.get(item.getCodigoServicio());
+
+                if (servicio.esPlan()) {
+                    detalle.setReferenciaCompra("C-" + item.getId());
+                    detalle.setSesionesTotales(servicio.sesiones());
+                    detalle.setEstadoRegistroPlan("REGISTRADO");
+                }
+
+                indiceItem++;
+            }
+
             orden.agregarDetalle(detalle);
             total += precio;
         }
-        orden.setTotal(total);
 
+        orden.setTotal(total);
         ordenes.save(orden);
-        items.deleteAll(aPagar);            // las atenciones pagadas salen del carrito
+
+        items.deleteAll(aPagar);
         return OrdenResponse.de(orden);
     }
 
@@ -131,6 +179,57 @@ public class OrdenService {
             throw new ApiException(HttpStatus.FORBIDDEN, "Solo puedes ver tus propias órdenes.");
         }
         return OrdenResponse.de(orden);
+    }
+
+    // Respaldo de RN-13: vuelve a registrar en ms-citas los planes pagados que quedaron "PENDIENTE".
+    // Hoy el pago es todo o nada (si ms-citas falla, la orden no se guarda), así que normalmente no hay
+    // pendientes; queda disponible por si un registro se marca PENDIENTE en el futuro.
+    @Transactional
+    public int reintentarRegistroPlanesPendientes() {
+
+        List<DetalleOrden> pendientes =
+                detallesOrden.findByEstadoRegistroPlanAndOrden_Estado(
+                        "PENDIENTE",
+                        "PAGADA"
+                );
+
+        int registrados = 0;
+
+        for (DetalleOrden detalle : pendientes) {
+
+            Orden orden = detalle.getOrden();
+
+            String referenciaCompra = detalle.getReferenciaCompra();
+
+            if (referenciaCompra == null || referenciaCompra.isBlank()) {
+                referenciaCompra = orden.getId() + "-" + detalle.getId();
+                detalle.setReferenciaCompra(referenciaCompra);
+            }
+
+            try {
+                citasClient.registrarPlan(new CitasClient.RegistrarPlanRequest(
+                        referenciaCompra,
+                        String.valueOf(orden.getId()),
+                        orden.getCorreoPaciente(),
+                        detalle.getCodigoServicio(),
+                        detalle.getNombreServicio(),
+                        detalle.getSesionesTotales()
+                ));
+
+                detalle.setEstadoRegistroPlan("REGISTRADO");
+                registrados++;
+
+            } catch (RuntimeException e) {
+                System.err.println(
+                        "Reintento fallido para el plan " + referenciaCompra
+                                + ": " + e.getMessage()
+                );
+            }
+
+            detallesOrden.save(detalle);
+        }
+
+        return registrados;
     }
 
     // ---------- reglas internas ----------
