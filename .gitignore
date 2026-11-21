@@ -16,7 +16,6 @@
 hs_err_pid*
 replay_pid*
 
-<<<<<<< HEAD
 # Archivos temporales
 *.ctxt
 .mtj.tmp/
@@ -29,23 +28,12 @@ replay_pid*
 nutrivida.env
 
 # Configuraciones locales de Spring Boot
-=======
-# Archivos de entorno y credenciales locales
-.env
-.env.*
-!.env.example
-
-# Archivos locales de Spring Boot
->>>>>>> 73e9e7c (feat(RN-13): implementar compra y registro de planes nutricionales)
 **/application-local.yaml
 **/application-local.yml
 
 # Archivos compilados de Maven
 **/target/
-<<<<<<< HEAD
 
 # Archivos locales de IDE
 .idea/
 .vscode/
-=======
->>>>>>> 73e9e7c (feat(RN-13): implementar compra y registro de planes nutricionales)

@@ -19,7 +19,13 @@ public class CatalogoClient {
             String codigo, String nombre, Long categoriaId, String tipo,
             String duracion, String modalidad, String profesional,
             int precio, int descuento, int precioFinal,
-            Integer sesiones, Integer cupos, String descripcion, boolean activo) { }
+            Integer sesiones, Integer cupos, String descripcion, boolean activo) {
+
+        /** Un plan es un servicio con cantidad de sesiones (mismo criterio que ms-citas). */
+        public boolean esPlan() {
+            return sesiones != null && sesiones > 0;
+        }
+    }
 
     private final RestClient http;
 
