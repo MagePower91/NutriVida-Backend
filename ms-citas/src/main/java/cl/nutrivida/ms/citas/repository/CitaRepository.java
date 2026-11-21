@@ -1,4 +1,3 @@
-
 package cl.nutrivida.ms.citas.repository;
 
 import cl.nutrivida.ms.citas.model.Cita;
@@ -45,8 +44,4 @@ public interface CitaRepository extends JpaRepository<Cita, Long> {
     LocalDateTime fechaHora,
     List<EstadoCita> estados
 );
-
-    
-
-
 }

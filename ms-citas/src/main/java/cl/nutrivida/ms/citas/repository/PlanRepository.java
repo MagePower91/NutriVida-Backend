@@ -1,4 +1,3 @@
-
 package cl.nutrivida.ms.citas.repository;
 
 import cl.nutrivida.ms.citas.model.Plan;

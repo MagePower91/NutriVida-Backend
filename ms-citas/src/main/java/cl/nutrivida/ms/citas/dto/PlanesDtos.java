@@ -1,4 +1,3 @@
-
 package cl.nutrivida.ms.citas.dto;
 
 import jakarta.validation.constraints.Min;

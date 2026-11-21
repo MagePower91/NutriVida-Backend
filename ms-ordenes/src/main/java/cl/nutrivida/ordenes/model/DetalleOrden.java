@@ -1,4 +1,3 @@
-
 package cl.nutrivida.ordenes.model;
 
 import jakarta.persistence.*;
@@ -35,7 +34,8 @@ public class DetalleOrden {
     private Long planId;
 
     // Seguimiento del registro del plan en ms-citas.
-    @Column(name = "estado_registro_plan", nullable = false, length = 20)
+    // NO_APLICA (no es plan), REGISTRADO o PENDIENTE. Opcional para no romper detalles antiguos.
+    @Column(name = "estado_registro_plan", length = 20)
     private String estadoRegistroPlan = "NO_APLICA";
 
     @Column(name = "referencia_compra", length = 100)

@@ -1,3 +1,7 @@
+// Plan de varias sesiones contratado por un paciente (RN-13). Se paga completo online, una sola vez,
+// y el paciente agenda sus sesiones de a una sin volver a pagar mientras le queden sesiones.
+// Las sesiones son citas normales con planId y precio 0 (el pago está en el plan).
+// La referencia de compra identifica la compra en ms-ordenes y evita registrar el mismo plan dos veces.
 
 package cl.nutrivida.ms.citas.model;
 
@@ -21,7 +25,9 @@ public class Plan {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "referencia_compra", nullable = false, length = 100)
+    // Opcional para no romper planes antiguos; única para no registrar dos veces la misma compra
+    // (MySQL permite varios NULL en una columna única).
+    @Column(name = "referencia_compra", length = 100)
     private String referenciaCompra;
 
     @Column(name = "orden_id", nullable = false, length = 50)

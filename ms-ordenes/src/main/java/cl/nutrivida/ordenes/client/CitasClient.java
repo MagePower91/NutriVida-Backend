@@ -1,3 +1,6 @@
+// Comunicación entre microservicios: al confirmar el pago, ms-ordenes le pide a ms-citas que agende lo pagado
+// (citas confirmadas, planes contratados y citas con pago en clínica que se pagan online).
+// Usa el token de servicio de ms-ordenes (rol SERVICIO), no el del paciente.
 
 package cl.nutrivida.ordenes.client;
 

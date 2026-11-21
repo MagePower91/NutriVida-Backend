@@ -1,3 +1,7 @@
+// Planes contratados (versión simplificada de RN-13): el paciente ve sus planes con el saldo de sesiones
+// y agenda la siguiente sin volver a pagar. Una sesión atendida se descuenta del saldo; una cancelada
+// o con inasistencia vuelve a él. El plan finaliza cuando todas sus sesiones fueron atendidas.
+// También registra planes que ms-ordenes informa por separado (registrarPlan), sin duplicarlos.
 
 package cl.nutrivida.ms.citas.service;
 

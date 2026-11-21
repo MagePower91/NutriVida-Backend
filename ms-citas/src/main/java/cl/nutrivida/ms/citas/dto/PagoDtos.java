@@ -20,22 +20,18 @@ public final class PagoDtos {
 
     /** Una atención del carrito que se acaba de pagar. Un plan puede venir sin fecha (sin primera sesión). */
     public record ItemPagado(
-        @Schema(example = "CN001") @NotBlank String codigoServicio,
-        @Schema(example = "2026-11-20T10:00:00") LocalDateTime fechaHora,
-        @Schema(example = "Carolina Fuentes") @Size(max = 100) String nutricionista,
-        @Size(max = 1000) String motivo,
-        @Size(max = 100) String referenciaCompra
-) {
-    // Mantiene compatibilidad con los lugares que todavía envían cuatro parámetros.
-    public ItemPagado(
-            String codigoServicio,
-            LocalDateTime fechaHora,
-            String nutricionista,
-            String motivo
-        ) {
-           this(codigoServicio, fechaHora, nutricionista, motivo, null);
-          }
+            @Schema(example = "CN001") @NotBlank String codigoServicio,
+            @Schema(example = "2026-11-20T10:00:00") LocalDateTime fechaHora,
+            @Schema(example = "Carolina Fuentes") @Size(max = 100) String nutricionista,
+            @Size(max = 1000) String motivo,
+            @Schema(example = "C-12", description = "Obligatoria en un plan: evita registrarlo dos veces")
+            @Size(max = 100) String referenciaCompra) {
+
+        // Mantiene compatibilidad con los lugares que todavía envían cuatro parámetros.
+        public ItemPagado(String codigoServicio, LocalDateTime fechaHora, String nutricionista, String motivo) {
+            this(codigoServicio, fechaHora, nutricionista, motivo, null);
         }
+    }
 
     public record PagoRequest(
             @Schema(example = "15") @NotBlank String ordenId,

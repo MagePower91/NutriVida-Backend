@@ -28,10 +28,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-    @Service
-    public class OrdenService {
+@Service
+public class OrdenService {
 
-    
     private final OrdenRepository ordenes;
     private final ItemCarritoRepository items;
     private final CatalogoClient catalogo;
@@ -102,23 +101,14 @@ import java.util.Map;
         ordenes.save(orden);
 
         List<ItemPagado> pagados = aPagar.stream()
-        .map(i -> {
-            ServicioCatalogo servicio = servicios.get(i.getCodigoServicio());
-
-            // La referencia se mantiene estable mientras el artículo siga en el carrito.
-            String referenciaCompra = servicio.esPlan()
-                    ? "C-" + i.getId()
-                    : null;
-
-            return new ItemPagado(
-                    i.getCodigoServicio(),
-                    i.getFechaHora(),
-                    i.getNutricionista(),
-                    i.getMotivo(),
-                    referenciaCompra
-            );
-        })
-        .toList();
+                .map(i -> {
+                    ServicioCatalogo servicio = servicios.get(i.getCodigoServicio());
+                    // La referencia se mantiene estable mientras el artículo siga en el carrito.
+                    String referenciaCompra = servicio.esPlan() ? "C-" + i.getId() : null;
+                    return new ItemPagado(i.getCodigoServicio(), i.getFechaHora(), i.getNutricionista(),
+                            i.getMotivo(), referenciaCompra);
+                })
+                .toList();
 
         PagoResponse agenda = citasClient.registrarPago(new PagoRequest(
                 String.valueOf(orden.getId()),
@@ -191,8 +181,9 @@ import java.util.Map;
         return OrdenResponse.de(orden);
     }
 
-    // ---------- reglas internas ----------
-
+    // Respaldo de RN-13: vuelve a registrar en ms-citas los planes pagados que quedaron "PENDIENTE".
+    // Hoy el pago es todo o nada (si ms-citas falla, la orden no se guarda), así que normalmente no hay
+    // pendientes; queda disponible por si un registro se marca PENDIENTE en el futuro.
     @Transactional
     public int reintentarRegistroPlanesPendientes() {
 
@@ -240,6 +231,8 @@ import java.util.Map;
 
         return registrados;
     }
+
+    // ---------- reglas internas ----------
 
     private boolean esPersonal(Jwt jwt) {
         String rol = jwt.getClaimAsString("rol");
