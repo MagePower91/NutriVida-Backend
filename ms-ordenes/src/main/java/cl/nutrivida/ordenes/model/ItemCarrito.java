@@ -23,7 +23,8 @@ public class ItemCarrito {
     @Column(nullable = false)
     private int precio;                    // precio final al momento de agregarlo (referencial)
 
-    private LocalDateTime fechaHora;       // null en un plan que se paga sin agendar su primera sesión
+    @Column(nullable = true)
+    private LocalDateTime fechaHora;
 
     @Column(length = 100)
     private String nutricionista;

@@ -173,7 +173,7 @@ public class CitaService {
         if (ReglasCita.debeCancelarsePorFaltaDeConfirmacion(cita, ahora())) {
             cita.setEstadoCita(EstadoCita.CANCELADA);
             citaRepository.save(cita);
-            throw new ApiException(HttpStatus.CONFLICT, "El plazo para confirmar venció y la cita fue cancelada.");
+            return cita;
         }
         cita.setEstadoCita(EstadoCita.CONFIRMADA);
         cita.setLimiteConfirmacion(null);
